@@ -11,6 +11,8 @@ const execFileAsync = promisify(execFile);
 const extractGitSnapshot = async (cwd: string, ref: string, sourceDir: string): Promise<string> => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'sf-df-delta-'));
   const archivePath = path.join(tempRoot, 'snapshot.tar');
+  const tarArchivePath = archivePath.replaceAll('\\', '/');
+  const tarOutputPath = tempRoot.replaceAll('\\', '/');
   // Capture the archive first so snapshot extraction works the same way from bash and cmd.exe.
   const { stdout } = await execFileAsync('git', ['archive', '--format=tar', ref, sourceDir], {
     cwd,
@@ -19,7 +21,7 @@ const extractGitSnapshot = async (cwd: string, ref: string, sourceDir: string): 
   });
 
   await writeFile(archivePath, stdout);
-  await execFileAsync('tar', ['-xf', archivePath, '-C', tempRoot], {
+  await execFileAsync('tar', ['-xf', tarArchivePath, '-C', tarOutputPath], {
     cwd,
     maxBuffer: 20 * 1024 * 1024,
   });
