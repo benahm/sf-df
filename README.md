@@ -95,7 +95,7 @@ To use your plugin, run using the local `./bin/dev` or `./bin/dev.cmd` file.
 
 ```bash
 # Run using local run file.
-./bin/dev hello world
+./bin/dev df
 ```
 
 There should be no differences when running via the Salesforce CLI or using the local run file. However, it can be useful to link the plugin to do some additional testing or run your commands from anywhere on your machine.
@@ -111,35 +111,35 @@ sf plugins
 
 <!-- commands -->
 
-- [`sf hello world`](#sf-hello-world)
+- [`sf df`](#sf-df)
 
-## `sf hello world`
+## `sf df`
 
-Say hello either to the world or someone you know.
+Run Deltaforce.
 
 ```
 USAGE
-  $ sf hello world [--json] [-n <value>]
+  $ sf df [--json] [-n <value>]
 
 FLAGS
-  -n, --name=<value>  [default: World] The name of the person you'd like to say hello to.
+  -n, --name=<value>  [default: Deltaforce] Name to include in the Deltaforce output.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Say hello either to the world or someone you know.
+  Run the root Deltaforce command (`sf df`).
 
-  Say hello either to the world or someone you know.
+  Run the root Deltaforce command (`sf df`).
 
 EXAMPLES
-  Say hello to the world:
+  Run the df command:
 
-    $ sf hello world
+    $ sf df
 
-  Say hello to someone you know:
+  Run with a custom name:
 
-    $ sf hello world --name Astro
+    $ sf df --name Deltaforce
 ```
 
 <!-- commandsstop -->

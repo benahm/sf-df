@@ -1,6 +1,6 @@
 {
   "name": "sf-df",
-  "description": "SF Data Factory plugin",
+  "description": "Deltaforce Salesforce CLI plugin",
   "version": "1.0.0",
   "dependencies": {
     "@oclif/core": "^4",
@@ -43,8 +43,8 @@
       "@oclif/plugin-help"
     ],
     "topics": {
-      "hello": {
-        "description": "Commands to say hello."
+      "df": {
+        "description": "Deltaforce commands."
       }
     },
     "flexibleTaxonomy": true

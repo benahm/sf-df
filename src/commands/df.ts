@@ -2,14 +2,14 @@ import { SfCommand, Flags } from '@salesforce/sf-plugins-core';
 import { Messages } from '@salesforce/core';
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url);
-const messages = Messages.loadMessages('sf-df', 'hello.world');
+const messages = Messages.loadMessages('sf-df', 'df');
 
-export type HelloWorldResult = {
+export type DfResult = {
   name: string;
   time: string;
 };
 
-export default class World extends SfCommand<HelloWorldResult> {
+export default class Df extends SfCommand<DfResult> {
   public static readonly summary = messages.getMessage('summary');
   public static readonly description = messages.getMessage('description');
   public static readonly examples = messages.getMessages('examples');
@@ -19,14 +19,14 @@ export default class World extends SfCommand<HelloWorldResult> {
       char: 'n',
       summary: messages.getMessage('flags.name.summary'),
       description: messages.getMessage('flags.name.description'),
-      default: 'World',
+      default: 'Deltaforce',
     }),
   };
 
-  public async run(): Promise<HelloWorldResult> {
-    const { flags } = await this.parse(World);
+  public async run(): Promise<DfResult> {
+    const { flags } = await this.parse(Df);
     const time = new Date().toDateString();
-    this.log(messages.getMessage('info.hello', [flags.name, time]));
+    this.log(messages.getMessage('info.df', [flags.name, time]));
     return {
       name: flags.name,
       time,
