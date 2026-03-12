@@ -35,7 +35,7 @@ describe('df', () => {
       .getCalls()
       .flatMap((c) => c.args)
       .join('\n');
-    expect(output).to.include('df command for team');
+    expect(output).to.include('Deltaforce command for team');
   });
 
   it('runs df --name team --json', async () => {
