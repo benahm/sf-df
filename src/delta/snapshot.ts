@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -10,22 +10,27 @@ const execFileAsync = promisify(execFile);
 
 const extractGitSnapshot = async (cwd: string, ref: string, sourceDir: string): Promise<string> => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'sf-df-delta-'));
-  const archivePath = path.join(tempRoot, 'snapshot.tar');
-  const tarArchivePath = archivePath.replaceAll('\\', '/');
-  const tarOutputPath = tempRoot.replaceAll('\\', '/');
-  // Capture the archive first so snapshot extraction works the same way from bash and cmd.exe.
-  const { stdout } = await execFileAsync('git', ['archive', '--format=tar', ref, sourceDir], {
+  const { stdout } = await execFileAsync('git', ['ls-tree', '-r', '--name-only', ref, sourceDir], {
     cwd,
-    encoding: 'buffer',
     maxBuffer: 20 * 1024 * 1024,
   });
+  const files = stdout
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 
-  await writeFile(archivePath, stdout);
-  await execFileAsync('tar', ['-xf', tarArchivePath, '-C', tarOutputPath], {
-    cwd,
-    maxBuffer: 20 * 1024 * 1024,
-  });
-  await rm(archivePath, { force: true });
+  await Promise.all(
+    files.map(async (relativePath) => {
+      const { stdout: content } = await execFileAsync('git', ['show', `${ref}:${relativePath}`], {
+        cwd,
+        encoding: 'buffer',
+        maxBuffer: 20 * 1024 * 1024,
+      });
+      const destination = path.join(tempRoot, relativePath);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await writeFile(destination, content);
+    })
+  );
 
   return tempRoot;
 };
