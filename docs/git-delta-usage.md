@@ -2,7 +2,7 @@
 
 ## Commande
 
-Commande exposée : [`src/commands/df/git/delta.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/commands/df/git/delta.ts)
+Commande exposée : [`src/commands/df/git/delta.ts`](../src/commands/df/git/delta.ts)
 
 Exemples :
 

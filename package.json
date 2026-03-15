@@ -18,7 +18,8 @@
     "eslint-plugin-sf-plugin": "^1.18.6",
     "oclif": "^4.14.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.0"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -67,8 +68,10 @@
     "prepack": "sf-prepack",
     "test": "wireit",
     "test:nuts": "nyc mocha \"**/*.nut.ts\" --slow 4500 --timeout 600000 --parallel",
-    "test:e2e:local": "nyc mocha \"test/e2e-local/**/*.e2e.test.ts\"",
-    "test:e2e:org": "nyc mocha \"test/e2e-org/**/*.org.e2e.test.ts\"",
+    "test:e2e:local": "node --no-deprecation ./node_modules/vitest/vitest.mjs run --config vitest.e2e-local.config.ts",
+    "test:e2e:org": "node --no-deprecation ./node_modules/vitest/vitest.mjs run --config vitest.e2e-org.config.ts",
+    "test-ui": "node tools/test-ui/dev.mjs",
+    "test-ui:build": "npm --prefix tools/test-ui/web run build",
     "test:only": "wireit",
     "version": "oclif readme"
   },

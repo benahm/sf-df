@@ -8,13 +8,13 @@ Chaque stratégie décide si elle supporte un chemin donné, puis produit soit :
 - un delta destructive partiel ;
 - un delete manifest-only si le type ne supporte pas un destructive XML fin.
 
-Le registre est défini dans [`src/delta/strategies/strategy-registry.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/delta/strategies/strategy-registry.ts).
+Le registre est défini dans [`src/delta/strategies/strategy-registry.ts`](../src/delta/strategies/strategy-registry.ts).
 
 ## Stratégies spécialisées
 
 ### `CustomLabelsStrategy`
 
-Fichier : [`src/delta/strategies/custom-labels-strategy.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/delta/strategies/custom-labels-strategy.ts)
+Fichier : [`src/delta/strategies/custom-labels-strategy.ts`](../src/delta/strategies/custom-labels-strategy.ts)
 
 - Cible `force-app/main/default/labels/`.
 - Root XML : `CustomLabels`.
@@ -23,7 +23,7 @@ Fichier : [`src/delta/strategies/custom-labels-strategy.ts`](/mnt/c/Users/abensa
 
 ### `WorkflowStrategy`
 
-Fichier : [`src/delta/strategies/workflow-strategy.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/delta/strategies/workflow-strategy.ts)
+Fichier : [`src/delta/strategies/workflow-strategy.ts`](../src/delta/strategies/workflow-strategy.ts)
 
 - Cible `force-app/main/default/workflows/`.
 - Root XML : `Workflow`.
@@ -32,7 +32,7 @@ Fichier : [`src/delta/strategies/workflow-strategy.ts`](/mnt/c/Users/abensaad/Do
 
 ### `ProfileStrategy`
 
-Fichier : [`src/delta/strategies/profile-strategy.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/delta/strategies/profile-strategy.ts)
+Fichier : [`src/delta/strategies/profile-strategy.ts`](../src/delta/strategies/profile-strategy.ts)
 
 - Cible `force-app/main/default/profiles/`.
 - Root XML : `Profile`.
@@ -42,7 +42,7 @@ Fichier : [`src/delta/strategies/profile-strategy.ts`](/mnt/c/Users/abensaad/Doc
 
 ### `TranslationsStrategy`
 
-Fichier : [`src/delta/strategies/translations-strategy.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/delta/strategies/translations-strategy.ts)
+Fichier : [`src/delta/strategies/translations-strategy.ts`](../src/delta/strategies/translations-strategy.ts)
 
 - Cible `force-app/main/default/translations/`.
 - Root XML : `Translations`.
@@ -53,7 +53,7 @@ Fichier : [`src/delta/strategies/translations-strategy.ts`](/mnt/c/Users/abensaa
 
 ### `GenericFileStrategy`
 
-Fichier : [`src/delta/strategies/generic-file-strategy.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/delta/strategies/generic-file-strategy.ts)
+Fichier : [`src/delta/strategies/generic-file-strategy.ts`](../src/delta/strategies/generic-file-strategy.ts)
 
 - Sert de dernière stratégie du registre.
 - Résout le composant via `metadata-resolver.ts`.

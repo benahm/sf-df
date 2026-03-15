@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-La commande [`src/commands/df/git/delta.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/commands/df/git/delta.ts) orchestre un pipeline simple :
+La commande [`src/commands/df/git/delta.ts`](../src/commands/df/git/delta.ts) orchestre un pipeline simple :
 
 1. lire le diff git entre `--from` et `--to` ou le workspace courant ;
 2. matérialiser les snapshots nécessaires ;
@@ -10,7 +10,7 @@ La commande [`src/commands/df/git/delta.ts`](/mnt/c/Users/abensaad/Documents/Git
 4. déléguer le traitement à une stratégie metadata ;
 5. écrire les fichiers delta et générer les manifests.
 
-Le coeur est dans [`src/delta/engine.ts`](/mnt/c/Users/abensaad/Documents/GitHub/sf-df/src/delta/engine.ts).
+Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
 
 ## Modules
 
