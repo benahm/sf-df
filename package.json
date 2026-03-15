@@ -67,6 +67,8 @@
     "prepack": "sf-prepack",
     "test": "wireit",
     "test:nuts": "nyc mocha \"**/*.nut.ts\" --slow 4500 --timeout 600000 --parallel",
+    "test:e2e:local": "nyc mocha \"test/e2e-local/**/*.e2e.test.ts\"",
+    "test:e2e:org": "nyc mocha \"test/e2e-org/**/*.org.e2e.test.ts\"",
     "test:only": "wireit",
     "version": "oclif readme"
   },
