@@ -17,6 +17,8 @@
     "@salesforce/dev-scripts": "^10",
     "eslint-plugin-sf-plugin": "^1.18.6",
     "oclif": "^4.14.0",
+    "oxfmt": "^0.40.0",
+    "oxlint": "^1.55.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
     "vitest": "^4.1.0"
@@ -55,139 +57,30 @@
     "flexibleTaxonomy": true
   },
   "scripts": {
-    "build": "wireit",
+    "build": "npm run compile && npm run lint",
     "clean": "sf-clean",
     "clean-all": "sf-clean all",
-    "compile": "wireit",
+    "compile": "tsc -p . --pretty --incremental",
     "docs": "sf-docs",
-    "format": "wireit",
-    "link-check": "wireit",
-    "lint": "wireit",
-    "postinstall": "bunx husky install",
+    "format": "oxfmt --write \"src/**/*.{ts,js,tsx,jsx}\" \"test/**/*.{ts,js,tsx,jsx}\" \"tools/**/*.mjs\" \"tools/**/*.js\"",
+    "format:check": "oxfmt --check \"src/**/*.{ts,js,tsx,jsx}\" \"test/**/*.{ts,js,tsx,jsx}\" \"tools/**/*.mjs\" \"tools/**/*.js\"",
+    "link-check": "node -e \"process.exit(process.env.CI ? 0 : 1)\" || linkinator \"**/*.md\" --skip \"CHANGELOG.md|node_modules|test/|confluence.internal.salesforce.com|my.salesforce.com|%s\" --markdown --retry --directory-listing --verbosity error",
+    "lint": "oxlint src test tools --deny-warnings",
+    "lint:fix": "oxlint src test tools --fix",
     "postpack": "sf-clean --ignore-signing-artifacts",
     "prepack": "sf-prepack",
-    "test": "wireit",
+    "test": "npm run test:compile && npm run test:only && npm run lint",
     "test:nuts": "nyc mocha \"**/*.nut.ts\" --slow 4500 --timeout 600000 --parallel",
     "test:e2e:local": "node --no-deprecation ./node_modules/vitest/vitest.mjs run --config vitest.e2e-local.config.ts",
     "test:e2e:org": "node --no-deprecation ./node_modules/vitest/vitest.mjs run --config vitest.e2e-org.config.ts",
     "test-ui": "node tools/test-ui/dev.mjs",
     "test-ui:build": "npm --prefix tools/test-ui/web run build",
-    "test:only": "wireit",
+    "test:compile": "tsc -p \"./test\" --pretty",
+    "test:only": "nyc mocha \"test/**/*.test.ts\"",
     "version": "oclif readme"
   },
   "publishConfig": {
     "access": "public"
-  },
-  "wireit": {
-    "build": {
-      "dependencies": [
-        "compile",
-        "lint"
-      ]
-    },
-    "compile": {
-      "command": "tsc -p . --pretty --incremental",
-      "files": [
-        "src/**/*.ts",
-        "**/tsconfig.json",
-        "messages/**"
-      ],
-      "output": [
-        "lib/**",
-        "*.tsbuildinfo"
-      ],
-      "clean": "if-file-deleted"
-    },
-    "format": {
-      "command": "prettier --write \"+(src|test|schemas)/**/*.+(ts|js|json)|command-snapshot.json\"",
-      "files": [
-        "src/**/*.ts",
-        "test/**/*.ts",
-        "schemas/**/*.json",
-        "command-snapshot.json",
-        ".prettier*"
-      ],
-      "output": []
-    },
-    "lint": {
-      "command": "eslint src test --color --cache --cache-location .eslintcache",
-      "files": [
-        "src/**/*.ts",
-        "test/**/*.ts",
-        "messages/**",
-        "**/.eslint*",
-        "**/tsconfig.json"
-      ],
-      "output": []
-    },
-    "test:compile": {
-      "command": "tsc -p \"./test\" --pretty",
-      "files": [
-        "test/**/*.ts",
-        "**/tsconfig.json"
-      ],
-      "output": []
-    },
-    "test": {
-      "dependencies": [
-        "test:compile",
-        "test:only",
-        "lint"
-      ]
-    },
-    "test:only": {
-      "command": "nyc mocha \"test/**/*.test.ts\"",
-      "env": {
-        "FORCE_COLOR": "2"
-      },
-      "files": [
-        "test/**/*.ts",
-        "src/**/*.ts",
-        "**/tsconfig.json",
-        ".mocha*",
-        "!*.nut.ts",
-        ".nycrc"
-      ],
-      "output": []
-    },
-    "test:command-reference": {
-      "command": "node --loader ts-node/esm --no-warnings=ExperimentalWarning \"./bin/dev.js\" commandreference:generate --erroronwarnings",
-      "files": [
-        "src/**/*.ts",
-        "messages/**",
-        "package.json"
-      ],
-      "output": [
-        "tmp/root"
-      ]
-    },
-    "test:deprecation-policy": {
-      "command": "node --loader ts-node/esm --no-warnings=ExperimentalWarning \"./bin/dev.js\" snapshot:compare",
-      "files": [
-        "src/**/*.ts"
-      ],
-      "output": [],
-      "dependencies": [
-        "compile"
-      ]
-    },
-    "test:json-schema": {
-      "command": "node --loader ts-node/esm --no-warnings=ExperimentalWarning \"./bin/dev.js\" schema:compare",
-      "files": [
-        "src/**/*.ts",
-        "schemas"
-      ],
-      "output": []
-    },
-    "link-check": {
-      "command": "node -e \"process.exit(process.env.CI ? 0 : 1)\" || linkinator \"**/*.md\" --skip \"CHANGELOG.md|node_modules|test/|confluence.internal.salesforce.com|my.salesforce.com|%s\" --markdown --retry --directory-listing --verbosity error",
-      "files": [
-        "./*.md",
-        "./!(CHANGELOG).md",
-        "messages/**/*.md"
-      ],
-      "output": []
-    }
   },
   "exports": "./lib/index.js",
   "type": "module",
