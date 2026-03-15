@@ -3,7 +3,7 @@ import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { expect } from 'chai';
+import { describe, it, expect, afterEach } from 'vitest';
 
 import { generateDelta } from '../../src/delta/engine.js';
 
@@ -15,6 +15,7 @@ const createRepoFromFixture = async (scenarioName: string): Promise<string> => {
 
   await cp(fixtureRoot, repoRoot, { recursive: true });
   runGit(repoRoot, ['init']);
+  runGit(repoRoot, ['config', 'core.autocrlf', 'false']);
   runGit(repoRoot, ['config', 'user.email', 'e2e@example.com']);
   runGit(repoRoot, ['config', 'user.name', 'E2E Tests']);
   runGit(repoRoot, ['add', '.']);
@@ -36,7 +37,11 @@ describe('e2e metadata deltas', () => {
 
   afterEach(async () => {
     if (repoRoot) {
-      await rm(repoRoot, { recursive: true, force: true });
+      try {
+        await rm(repoRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      } catch {
+        // Temp cleanup is best-effort on Windows where file handles can be briefly locked.
+      }
       repoRoot = undefined;
     }
   });

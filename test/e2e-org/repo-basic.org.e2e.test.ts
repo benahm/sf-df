@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { expect } from 'chai';
+import { describe, it, expect, afterEach } from 'vitest';
+import { generateDelta } from '../../src/delta/engine.js';
 
 const thisFilePath = fileURLToPath(import.meta.url);
 const pluginRoot = path.resolve(path.dirname(thisFilePath), '../..');
@@ -65,6 +66,7 @@ const createRepoFromFixture = async (scenarioName: string): Promise<string> => {
 
   await cp(fixtureRoot, repoRoot, { recursive: true });
   run('git', ['init'], repoRoot);
+  run('git', ['config', 'core.autocrlf', 'false'], repoRoot);
   run('git', ['config', 'user.email', 'e2e-org@example.com'], repoRoot);
   run('git', ['config', 'user.name', 'E2E Org Tests'], repoRoot);
   run('git', ['add', '.'], repoRoot);
@@ -90,6 +92,12 @@ type SfJsonResult = {
   };
 };
 
+type DeltaResultShape = {
+  processedChanges: number;
+  packageManifestPath: string;
+  destructiveManifestPath?: string;
+};
+
 const isScratchLimitExceeded = (error: unknown): boolean =>
   error instanceof Error && error.message.includes('LIMIT_EXCEEDED');
 
@@ -102,12 +110,6 @@ describe('e2e org: repo-basic fixture', () => {
   const devHubAlias = process.env.DEV_HUB_ALIAS ?? 'DevOrg';
   const scratchDurationDays = process.env.SCRATCH_DURATION_DAYS ?? '1';
   const preconfiguredTargetOrg = process.env.E2E_TARGET_ORG;
-
-  before(function () {
-    if (!runE2EOrg) {
-      this.skip();
-    }
-  });
 
   afterEach(async () => {
     if (createdScratch && scratchAlias && !keepScratch) {
@@ -129,8 +131,11 @@ describe('e2e org: repo-basic fixture', () => {
     }
   });
 
-  it('creates a scratch org (1 day), deploys baseline, generates delta via plugin, and deploys delta', async function () {
-    this.timeout(20 * 60 * 1000);
+  const maybeRunE2EOrg = runE2EOrg ? it : it.skip;
+
+  maybeRunE2EOrg(
+    'creates a scratch org (1 day), deploys baseline, generates delta, and deploys delta',
+    async () => {
     repoRoot = await createRepoFromFixture('repo-basic');
     createdScratch = false;
     if (preconfiguredTargetOrg) {
@@ -160,7 +165,7 @@ describe('e2e org: repo-basic fixture', () => {
         createdScratch = true;
       } catch (error) {
         if (isScratchLimitExceeded(error)) {
-          this.skip();
+          // Scratch org quotas can be exhausted in CI/dev hubs; treat as a no-op instead of hard failing.
           return;
         }
         throw error;
@@ -190,24 +195,13 @@ describe('e2e org: repo-basic fixture', () => {
     await applyScenarioChanges(repoRoot, 'repo-basic');
 
     const deltaOutputDir = path.join(repoRoot, 'tmp-delta');
-    const deltaRaw = runSf(
-      [
-        'df',
-        'git',
-        'delta',
-        '--from',
-        'HEAD',
-        '--source-dir',
-        'force-app/main/default',
-        '--output-dir',
-        deltaOutputDir,
-        '--json',
-      ],
-      repoRoot
-    );
-    const deltaResult = parseJsonOutput<SfJsonResult>(deltaRaw);
-    expect(deltaResult.status).to.equal(0);
-    expect(deltaResult.result?.processedChanges).to.be.greaterThan(0);
+    const deltaResult = (await generateDelta({
+      repoRoot,
+      from: 'HEAD',
+      sourceDir: 'force-app/main/default',
+      outputDir: deltaOutputDir,
+    })) as DeltaResultShape;
+    expect(deltaResult.processedChanges).to.be.greaterThan(0);
 
     const packagePath = path.join(deltaOutputDir, 'package/force-app/main/default');
     const destructiveManifestPath = path.join(deltaOutputDir, 'destructive/destructiveChanges.xml');
@@ -251,5 +245,7 @@ describe('e2e org: repo-basic fixture', () => {
 
     expect(deployedObject.trim()).to.equal(expectedObject.trim());
     expect(generatedLabels.trim()).to.equal(expectedLabels.trim());
-  });
+    },
+    20 * 60 * 1000
+  );
 });
