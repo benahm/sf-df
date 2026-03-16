@@ -14,7 +14,11 @@ export class StrategyRegistry {
     new GenericFileStrategy(),
   ];
 
-  public getStrategy(relativePath: string): MetadataDeltaStrategy {
-    return this.strategies.find((strategy) => strategy.supports(relativePath)) ?? this.strategies.at(-1)!;
+  public getStrategy(operation: Parameters<MetadataDeltaStrategy['supports']>[0]): MetadataDeltaStrategy {
+    return (
+      this.strategies.find((strategy) => !strategy.isFallback && strategy.supports(operation)) ??
+      this.strategies.find((strategy) => strategy.isFallback) ??
+      this.strategies.at(-1)!
+    );
   }
 }

@@ -2,12 +2,11 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 
 import { diffCompositeXml, type XmlCollectionRules } from '../xml.js';
-import { resolveManifestEntry } from '../metadata-resolver.js';
-import type { DeltaArtifacts, MetadataDeltaStrategy, ProcessOperation } from '../types.js';
+import type { DeltaArtifacts, MetadataDeltaStrategy, ResolvedOperation } from '../types.js';
 
 export type XmlStrategyOptions = {
   name: string;
-  matcher: (relativePath: string) => boolean;
+  metadataTypes: string[];
   rootName: string;
   rules: XmlCollectionRules;
   alwaysInclude?: string[];
@@ -17,7 +16,7 @@ export type XmlStrategyOptions = {
 export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
   public readonly name: string;
 
-  private readonly matcher: XmlStrategyOptions['matcher'];
+  private readonly metadataTypes: Set<string>;
   private readonly rootName: string;
   private readonly rules: XmlCollectionRules;
   private readonly alwaysInclude: string[];
@@ -25,20 +24,20 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
 
   public constructor(options: XmlStrategyOptions) {
     this.name = options.name;
-    this.matcher = options.matcher;
+    this.metadataTypes = new Set(options.metadataTypes);
     this.rootName = options.rootName;
     this.rules = options.rules;
     this.alwaysInclude = options.alwaysInclude ?? [];
     this.supportsDestructive = options.supportsDestructive ?? false;
   }
 
-  public supports(relativePath: string): boolean {
-    return this.matcher(relativePath);
+  public supports({ resolvedMetadata, manifestEntry }: ResolvedOperation): boolean {
+    const metadataType = resolvedMetadata?.typeName ?? manifestEntry?.type;
+    return metadataType ? this.metadataTypes.has(metadataType) : false;
   }
 
-  public async build(operation: ProcessOperation): Promise<DeltaArtifacts | undefined> {
+  public async build({ operation, manifestEntry }: ResolvedOperation): Promise<DeltaArtifacts | undefined> {
     if (operation.kind === 'destructive' && !this.supportsDestructive) {
-      const manifestEntry = await resolveManifestEntry(operation.sourceSnapshot, operation.relativePath);
       return manifestEntry
         ? {
             dedupeKey: `${this.name}:warning:${manifestEntry.type}:${manifestEntry.fullName}`,
@@ -50,7 +49,7 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
         : undefined;
     }
 
-    const currentSnapshot = operation.kind === 'package' ? operation.sourceSnapshot : operation.sourceSnapshot;
+    const currentSnapshot = operation.sourceSnapshot;
     const absoluteCurrentPath = path.join(currentSnapshot.rootDir, operation.relativePath);
     const currentXml = await readFile(absoluteCurrentPath, 'utf8');
 
@@ -60,7 +59,6 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
 
     const [oldXml, newXml] = operation.kind === 'package' ? [compareXml, currentXml] : [currentXml, compareXml];
     const diff = diffCompositeXml(oldXml, newXml, this.rootName, this.rules, this.alwaysInclude);
-    const manifestEntry = await resolveManifestEntry(currentSnapshot, operation.relativePath);
 
     if (operation.kind === 'package') {
       if (!diff.packageXml) {

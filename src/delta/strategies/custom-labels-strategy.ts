@@ -4,7 +4,7 @@ export class CustomLabelsStrategy extends XmlCollectionDeltaStrategy {
   public constructor() {
     super({
       name: 'customLabels',
-      matcher: (relativePath) => relativePath.startsWith('force-app/main/default/labels/'),
+      metadataTypes: ['CustomLabels'],
       rootName: 'CustomLabels',
       supportsDestructive: true,
       rules: {

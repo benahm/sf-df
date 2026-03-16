@@ -9,7 +9,7 @@ export class TranslationsStrategy extends XmlCollectionDeltaStrategy {
   public constructor() {
     super({
       name: 'translations',
-      matcher: (relativePath) => relativePath.startsWith('force-app/main/default/translations/'),
+      metadataTypes: ['Translations'],
       rootName: 'Translations',
       rules: {
         customApplications: keyedBy('name'),

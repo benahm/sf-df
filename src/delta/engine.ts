@@ -4,6 +4,7 @@ import path from 'node:path';
 import { copyFileInto, ensureDir } from './fs.js';
 import { getGitChanges } from './git.js';
 import { buildManifestXml } from './manifest.js';
+import { resolveManifestEntry, resolveMetadataFromPath } from './metadata-resolver.js';
 import { SnapshotManager } from './snapshot.js';
 import { StrategyRegistry } from './strategies/strategy-registry.js';
 import type {
@@ -13,6 +14,7 @@ import type {
   GitChange,
   GitChangeStatus,
   ProcessOperation,
+  ResolvedOperation,
 } from './types.js';
 
 const emptyCountsByStatus = (): Record<GitChangeStatus, number> => ({
@@ -119,6 +121,20 @@ const parseManifestSet = (entries: Set<string>): Array<{ type: string; fullName:
     return { type, fullName };
   });
 
+const resolveOperation = async (operation: ProcessOperation): Promise<ResolvedOperation> => {
+  const [resolvedMetadata, manifestEntry] = await Promise.all([
+    resolveMetadataFromPath(operation.sourceSnapshot, operation.relativePath),
+    resolveManifestEntry(operation.sourceSnapshot, operation.relativePath),
+  ]);
+
+  return {
+    operation,
+    relativePath: operation.relativePath,
+    resolvedMetadata,
+    manifestEntry,
+  };
+};
+
 export const generateDelta = async (options: {
   repoRoot: string;
   from: string;
@@ -162,10 +178,13 @@ export const generateDelta = async (options: {
       const operations = normalizeOperations(change, oldSnapshot, newSnapshot);
 
       for (const operation of operations) {
-        const strategy = registry.getStrategy(operation.relativePath);
+        // Resolve metadata once so strategy selection and generic fallback share the same context.
+        // eslint-disable-next-line no-await-in-loop
+        const resolvedOperation = await resolveOperation(operation);
+        const strategy = registry.getStrategy(resolvedOperation);
         // Strategy execution stays sequential so file writes and dedupe decisions remain deterministic.
         // eslint-disable-next-line no-await-in-loop
-        const artifacts = await strategy.build(operation);
+        const artifacts = await strategy.build(resolvedOperation);
         if (!artifacts || dedupeKeys.has(artifacts.dedupeKey)) {
           continue;
         }

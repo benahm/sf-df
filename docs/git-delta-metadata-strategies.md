@@ -2,7 +2,7 @@
 
 ## Principe
 
-Chaque stratégie décide si elle supporte un chemin donné, puis produit soit :
+Chaque stratégie décide si elle supporte une opération metadata déjà résolue, puis produit soit :
 
 - un delta package partiel ;
 - un delta destructive partiel ;
@@ -10,13 +10,19 @@ Chaque stratégie décide si elle supporte un chemin donné, puis produit soit :
 
 Le registre est défini dans [`src/delta/strategies/strategy-registry.ts`](../src/delta/strategies/strategy-registry.ts).
 
+Le comportement attendu est :
+
+- par défaut, toute metadata modifiée part dans le delta via `GenericFileStrategy` ;
+- seulement les metadata avec des besoins particuliers ont une stratégie dédiée ;
+- une stratégie spécialisée se branche sur le type metadata (`CustomLabels`, `Workflow`, `Profile`, `Translations`) plutôt que sur un chemin figé.
+
 ## Stratégies spécialisées
 
 ### `CustomLabelsStrategy`
 
 Fichier : [`src/delta/strategies/custom-labels-strategy.ts`](../src/delta/strategies/custom-labels-strategy.ts)
 
-- Cible `force-app/main/default/labels/`.
+- Cible le type metadata `CustomLabels`.
 - Root XML : `CustomLabels`.
 - Diff par `labels.fullName`.
 - Supporte le destructive partiel.
@@ -25,7 +31,7 @@ Fichier : [`src/delta/strategies/custom-labels-strategy.ts`](../src/delta/strate
 
 Fichier : [`src/delta/strategies/workflow-strategy.ts`](../src/delta/strategies/workflow-strategy.ts)
 
-- Cible `force-app/main/default/workflows/`.
+- Cible le type metadata `Workflow`.
 - Root XML : `Workflow`.
 - Diff sur les collections comme `alerts`, `rules`, `tasks`, `fieldUpdates`.
 - Supporte le destructive partiel quand une collection déclare `supportsDelete`.
@@ -34,7 +40,7 @@ Fichier : [`src/delta/strategies/workflow-strategy.ts`](../src/delta/strategies/
 
 Fichier : [`src/delta/strategies/profile-strategy.ts`](../src/delta/strategies/profile-strategy.ts)
 
-- Cible `force-app/main/default/profiles/`.
+- Cible le type metadata `Profile`.
 - Root XML : `Profile`.
 - Utilise des clés métier stables par collection : `field`, `object`, `apexClass`, `layout + recordType`, etc.
 - Réinjecte systématiquement quelques champs racine (`custom`, `description`, `userLicense`) pour garder un XML déployable.
@@ -44,7 +50,7 @@ Fichier : [`src/delta/strategies/profile-strategy.ts`](../src/delta/strategies/p
 
 Fichier : [`src/delta/strategies/translations-strategy.ts`](../src/delta/strategies/translations-strategy.ts)
 
-- Cible `force-app/main/default/translations/`.
+- Cible le type metadata `Translations`.
 - Root XML : `Translations`.
 - Diff par nom logique sur les sections comme `customLabels`, `fields`, `layouts`, `recordTypes`, `validationRules`.
 - Ne produit pas de destructive XML partiel ; suppression en manifest-only.
@@ -56,7 +62,7 @@ Fichier : [`src/delta/strategies/translations-strategy.ts`](../src/delta/strateg
 Fichier : [`src/delta/strategies/generic-file-strategy.ts`](../src/delta/strategies/generic-file-strategy.ts)
 
 - Sert de dernière stratégie du registre.
-- Résout le composant via `metadata-resolver.ts`.
+- Réutilise le metadata déjà résolu par le moteur.
 - Copie tous les fichiers contenus dans le composant résolu.
 - Pour un delete, ajoute seulement l'entrée au manifest destructive.
 
@@ -65,6 +71,13 @@ Ce fallback couvre aussi les bundles quand le resolver retourne un répertoire c
 ## Ajouter une nouvelle stratégie
 
 1. Créer un fichier sous `src/delta/strategies/`.
-2. Implémenter `supports(relativePath)` et `build(operation)`.
-3. Si le metadata est XML composite, préférer hériter de `XmlCollectionDeltaStrategy`.
-4. Enregistrer la stratégie avant `GenericFileStrategy` dans `StrategyRegistry`.
+2. Décider si le comportement générique suffit.
+3. Si le metadata a un comportement particulier, implémenter une stratégie dédiée.
+4. Si le metadata est XML composite, préférer hériter de `XmlCollectionDeltaStrategy`.
+5. Déclarer les `metadataTypes` gérés par la stratégie.
+6. Enregistrer la stratégie avant `GenericFileStrategy` dans `StrategyRegistry`.
+
+Exemple de règle d'évolution :
+
+- étape 1 : un nouveau metadata arrive, aucun code à écrire tant que la copie complète du composant suffit ;
+- étape 2 : si ce metadata nécessite un diff partiel, on ajoute une stratégie spécialisée centrée sur ce type, sans casser le fallback générique.

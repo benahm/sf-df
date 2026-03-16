@@ -2,24 +2,20 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import { collectFilesRecursively, pathExists } from '../fs.js';
-import { resolveManifestEntry, resolveMetadataFromPath } from '../metadata-resolver.js';
-import type { DeltaArtifacts, MetadataDeltaStrategy, ProcessOperation } from '../types.js';
+import type { DeltaArtifacts, MetadataDeltaStrategy, ResolvedOperation } from '../types.js';
 
 const toAbsolutePath = (rootDir: string, relativePath: string): string => path.join(rootDir, relativePath);
 
 export class GenericFileStrategy implements MetadataDeltaStrategy {
   public readonly name = 'generic';
+  public readonly isFallback = true;
 
-  // eslint-disable-next-line class-methods-use-this
   public supports(): boolean {
     return true;
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  public async build(operation: ProcessOperation): Promise<DeltaArtifacts | undefined> {
+  public async build({ operation, resolvedMetadata: resolved, manifestEntry }: ResolvedOperation): Promise<DeltaArtifacts | undefined> {
     const snapshot = operation.sourceSnapshot;
-    const resolved = await resolveMetadataFromPath(snapshot, operation.relativePath);
-    const manifestEntry = await resolveManifestEntry(snapshot, operation.relativePath);
 
     if (operation.kind === 'destructive') {
       if (!manifestEntry) {
