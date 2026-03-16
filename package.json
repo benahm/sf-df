@@ -20,7 +20,7 @@
     "oxfmt": "^0.40.0",
     "oxlint": "^1.55.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.0"
   },
   "engines": {
