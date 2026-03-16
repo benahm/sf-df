@@ -6,10 +6,10 @@ const keyedBy = (fieldName: string): XmlKeyRule => ({
 });
 
 export class TranslationsStrategy extends XmlCollectionDeltaStrategy {
-  public constructor() {
+  public constructor(sourceDir = 'force-app/main/default') {
     super({
       name: 'translations',
-      matcher: (relativePath) => relativePath.startsWith('force-app/main/default/translations/'),
+      matcher: (relativePath) => relativePath.startsWith(`${sourceDir}/translations/`),
       rootName: 'Translations',
       rules: {
         customApplications: keyedBy('name'),

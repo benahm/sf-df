@@ -123,6 +123,90 @@ describe('delta engine', () => {
     expect(destructiveLabels).to.contain('<fullName>LabelOne</fullName>');
     expect(destructiveManifest).to.contain('<name>CustomLabels</name>');
   });
+
+  it('writes partial package XML for record types with required singleton fields', async () => {
+    repoRoot = await setupRepo();
+
+    await writeRepoFile(
+      repoRoot,
+      'force-app/main/default/objects/Invoice__c/recordTypes/B2B.recordType-meta.xml',
+      '<?xml version="1.0" encoding="UTF-8"?>\n<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">\n  <fullName>B2B</fullName>\n  <active>true</active>\n  <label>B2B</label>\n  <businessProcess>InvoiceProcess</businessProcess>\n  <compactLayoutAssignment>Invoice_Compact</compactLayoutAssignment>\n  <picklistValues>\n    <picklist>Status__c</picklist>\n    <values><fullName>Draft</fullName><default>true</default></values>\n  </picklistValues>\n  <description>Baseline description</description>\n</RecordType>\n'
+    );
+
+    runGit(repoRoot, ['add', '.']);
+    runGit(repoRoot, ['commit', '-m', 'base']);
+
+    await writeRepoFile(
+      repoRoot,
+      'force-app/main/default/objects/Invoice__c/recordTypes/B2B.recordType-meta.xml',
+      '<?xml version="1.0" encoding="UTF-8"?>\n<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">\n  <fullName>B2B</fullName>\n  <active>true</active>\n  <label>B2B</label>\n  <businessProcess>InvoiceProcess</businessProcess>\n  <compactLayoutAssignment>Invoice_Compact</compactLayoutAssignment>\n  <picklistValues>\n    <picklist>Status__c</picklist>\n    <values><fullName>Draft</fullName><default>false</default></values>\n    <values><fullName>Approved</fullName><default>true</default></values>\n  </picklistValues>\n  <description>Baseline description</description>\n</RecordType>\n'
+    );
+
+    const outputDir = path.join(repoRoot, 'tmp-output');
+    const result = await generateDelta({
+      repoRoot,
+      from: 'HEAD',
+      sourceDir: 'force-app/main/default',
+      outputDir,
+    });
+
+    const recordTypeDelta = await readFile(
+      path.join(outputDir, 'package/force-app/main/default/objects/Invoice__c/recordTypes/B2B.recordType-meta.xml'),
+      'utf8'
+    );
+    const packageXml = await readFile(result.packageManifestPath, 'utf8');
+
+    expect(recordTypeDelta).to.contain('<fullName>B2B</fullName>');
+    expect(recordTypeDelta).to.contain('<active>true</active>');
+    expect(recordTypeDelta).to.contain('<label>B2B</label>');
+    expect(recordTypeDelta).to.contain('<businessProcess>InvoiceProcess</businessProcess>');
+    expect(recordTypeDelta).to.contain('<compactLayoutAssignment>Invoice_Compact</compactLayoutAssignment>');
+    expect(recordTypeDelta).to.contain('<picklistValues>');
+    expect(recordTypeDelta).to.contain('<fullName>Approved</fullName>');
+    expect(recordTypeDelta).not.to.contain('<description>Baseline description</description>');
+    expect(packageXml).to.contain('<name>RecordType</name>');
+    expect(packageXml).to.contain('<members>Invoice__c.B2B</members>');
+  });
+
+  it('applies record type strategy when using a custom sourceDir', async () => {
+    repoRoot = await setupRepo();
+
+    await writeRepoFile(
+      repoRoot,
+      'pkg/main/default/objects/Invoice__c/recordTypes/B2B.recordType-meta.xml',
+      '<?xml version="1.0" encoding="UTF-8"?>\n<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">\n  <fullName>B2B</fullName>\n  <active>true</active>\n  <label>B2B</label>\n  <businessProcess>InvoiceProcess</businessProcess>\n  <compactLayoutAssignment>Invoice_Compact</compactLayoutAssignment>\n  <picklistValues>\n    <picklist>Status__c</picklist>\n    <values><fullName>Draft</fullName><default>true</default></values>\n  </picklistValues>\n  <description>Baseline description</description>\n</RecordType>\n'
+    );
+
+    runGit(repoRoot, ['add', '.']);
+    runGit(repoRoot, ['commit', '-m', 'base']);
+
+    await writeRepoFile(
+      repoRoot,
+      'pkg/main/default/objects/Invoice__c/recordTypes/B2B.recordType-meta.xml',
+      '<?xml version="1.0" encoding="UTF-8"?>\n<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">\n  <fullName>B2B</fullName>\n  <active>true</active>\n  <label>B2B</label>\n  <businessProcess>InvoiceProcess</businessProcess>\n  <compactLayoutAssignment>Invoice_Compact</compactLayoutAssignment>\n  <picklistValues>\n    <picklist>Status__c</picklist>\n    <values><fullName>Draft</fullName><default>false</default></values>\n    <values><fullName>Approved</fullName><default>true</default></values>\n  </picklistValues>\n  <description>Baseline description</description>\n</RecordType>\n'
+    );
+
+    const outputDir = path.join(repoRoot, 'tmp-output');
+    const result = await generateDelta({
+      repoRoot,
+      from: 'HEAD',
+      sourceDir: 'pkg/main/default',
+      outputDir,
+    });
+
+    const recordTypeDelta = await readFile(
+      path.join(outputDir, 'package/pkg/main/default/objects/Invoice__c/recordTypes/B2B.recordType-meta.xml'),
+      'utf8'
+    );
+    const packageXml = await readFile(result.packageManifestPath, 'utf8');
+
+    expect(recordTypeDelta).to.contain('<fullName>B2B</fullName>');
+    expect(recordTypeDelta).to.contain('<picklistValues>');
+    expect(recordTypeDelta).to.contain('<fullName>Approved</fullName>');
+    expect(recordTypeDelta).not.to.contain('<description>Baseline description</description>');
+    expect(packageXml).to.contain('<name>RecordType</name>');
+    expect(packageXml).to.contain('<members>Invoice__c.B2B</members>');
+  });
 });
 
 describe('diffCompositeXml', () => {
