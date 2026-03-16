@@ -14,6 +14,7 @@ const webDistDir = path.join(__dirname, '..', 'web', 'dist');
 const PORT = Number(process.env.TEST_UI_API_PORT ?? 8787);
 const runs = new Map();
 const sseClients = new Set();
+const RUN_ENV_KEYS = ['RUN_E2E_ORG', 'E2E_TARGET_ORG', 'DEV_HUB_ALIAS', 'SCRATCH_DURATION_DAYS', 'E2E_KEEP_ORG'];
 
 const toJson = (status, data) => ({ status, body: JSON.stringify(data) });
 
@@ -104,6 +105,11 @@ const startRun = ({ suite, targetOrg, devHubAlias, scratchDurationDays, keepOrg 
   broadcast({ type: 'created', run: runSummary(run) });
 
   const command = buildCommand({ suite, targetOrg, devHubAlias, scratchDurationDays, keepOrg });
+  const childEnv = { ...process.env };
+  for (const key of RUN_ENV_KEYS) {
+    delete childEnv[key];
+  }
+
   const spawnArgs =
     process.platform === 'win32'
       ? ['/d', '/s', '/c', command.command]
@@ -112,7 +118,7 @@ const startRun = ({ suite, targetOrg, devHubAlias, scratchDurationDays, keepOrg 
     cwd: repoRoot,
     shell: false,
     env: {
-      ...process.env,
+      ...childEnv,
       ...command.env,
       FORCE_COLOR: '0',
     },
