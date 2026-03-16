@@ -9,7 +9,7 @@ La commande [`src/commands/df/git/delta.ts`](../src/commands/df/git/delta.ts) or
 3. transformer chaque changement en opération `package` ou `destructive` ;
 4. résoudre une fois le metadata concerné ;
 5. déléguer le traitement à une stratégie metadata ;
-5. écrire les fichiers delta et générer les manifests.
+6. écrire les fichiers delta et générer les manifests.
 
 Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
 

@@ -14,7 +14,7 @@ Le comportement attendu est :
 
 - par défaut, toute metadata modifiée part dans le delta via `GenericFileStrategy` ;
 - seulement les metadata avec des besoins particuliers ont une stratégie dédiée ;
-- une stratégie spécialisée se branche sur le type metadata (`CustomLabels`, `Workflow`, `Profile`, `Translations`) plutôt que sur un chemin figé.
+- une stratégie spécialisée se branche sur le type metadata (`CustomLabels`, `Workflow`, `Profile`, `RecordType`, `Translations`) plutôt que sur un chemin figé.
 
 ## Stratégies spécialisées
 
@@ -53,6 +53,16 @@ Fichier : [`src/delta/strategies/translations-strategy.ts`](../src/delta/strateg
 - Cible le type metadata `Translations`.
 - Root XML : `Translations`.
 - Diff par nom logique sur les sections comme `customLabels`, `fields`, `layouts`, `recordTypes`, `validationRules`.
+- Ne produit pas de destructive XML partiel ; suppression en manifest-only.
+
+### `RecordTypeStrategy`
+
+Fichier : [`src/delta/strategies/record-type-strategy.ts`](../src/delta/strategies/record-type-strategy.ts)
+
+- Cible le type metadata `RecordType`.
+- Root XML : `RecordType`.
+- Réinjecte les singletons requis (`fullName`, `active`, `label`, `businessProcess`, `compactLayoutAssignment`) pour garder un delta déployable.
+- Laisse `diffCompositeXml` inclure automatiquement les autres champs modifiés hors collections déclarées.
 - Ne produit pas de destructive XML partiel ; suppression en manifest-only.
 
 ## Fallback générique
