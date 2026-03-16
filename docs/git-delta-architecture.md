@@ -7,7 +7,8 @@ La commande [`src/commands/df/git/delta.ts`](../src/commands/df/git/delta.ts) or
 1. lire le diff git entre `--from` et `--to` ou le workspace courant ;
 2. matérialiser les snapshots nécessaires ;
 3. transformer chaque changement en opération `package` ou `destructive` ;
-4. déléguer le traitement à une stratégie metadata ;
+4. résoudre une fois le metadata concerné ;
+5. déléguer le traitement à une stratégie metadata ;
 5. écrire les fichiers delta et générer les manifests.
 
 Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
@@ -31,12 +32,14 @@ Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
 - S'appuie sur `@salesforce/source-deploy-retrieve` pour résoudre type + fullName.
 - Tente un fallback par convention de dossier si le resolver ne suffit pas.
 - Gère explicitement les bundles `aura`, `lwc`, `experiences` et `staticresources`.
+- Fournit un contexte réutilisable par le registre et les stratégies pour éviter les résolutions dupliquées.
 
 ### `strategies/*`
 
-- `StrategyRegistry` choisit la première stratégie compatible avec le chemin.
+- `StrategyRegistry` choisit d'abord une stratégie spécialisée à partir du type metadata résolu.
+- `GenericFileStrategy` est le fallback explicite si aucune stratégie spécifique ne s'applique.
 - Les stratégies XML spécialisées dérivent de `XmlCollectionDeltaStrategy`.
-- `GenericFileStrategy` sert de fallback pour tous les autres metadata.
+- Les stratégies ne sont plus couplées à un `sourceDir` codé en dur.
 
 ### `xml.ts`
 
@@ -65,6 +68,30 @@ Chaque opération produit un `DeltaArtifacts` contenant au besoin :
 - des warnings.
 
 Le moteur déduplique les artefacts via `dedupeKey` pour éviter les doublons lorsqu'un même composant est touché plusieurs fois.
+
+## Contrat d'extension
+
+Le pipeline suit désormais deux niveaux simples :
+
+1. comportement générique : si un metadata est modifié, il est inclus dans le delta via `GenericFileStrategy` ;
+2. comportement spécifique : un metadata peut surcharger ce comportement via une stratégie dédiée.
+
+Concrètement, le moteur construit un `ResolvedOperation` avec :
+
+- l'opération git normalisée ;
+- le metadata résolu (`resolvedMetadata`) ;
+- l'entrée de manifest résolue (`manifestEntry`).
+
+Le registre choisit ensuite :
+
+- une stratégie spécifique si `supports(ResolvedOperation)` retourne `true` ;
+- sinon le fallback générique.
+
+Ce modèle rend l'ajout d'un nouveau metadata spécifique évolutif :
+
+1. rien faire si le comportement générique suffit ;
+2. créer une stratégie dédiée si le metadata a des règles de delta particulières ;
+3. l'enregistrer dans `StrategyRegistry` avant le fallback générique.
 
 ## Dépendances clés
 

@@ -37,6 +37,13 @@ export type ProcessOperation = {
   targetSnapshot?: SnapshotRef;
 };
 
+export type ResolvedOperation = {
+  operation: ProcessOperation;
+  relativePath: string;
+  resolvedMetadata?: ResolvedMetadataComponent;
+  manifestEntry?: ManifestEntry;
+};
+
 export type ResolvedMetadataComponent = {
   typeName: string;
   fullName: string;
@@ -76,6 +83,7 @@ export type DeltaResult = DeltaSummary & {
 
 export type MetadataDeltaStrategy = {
   readonly name: string;
-  supports(relativePath: string): boolean;
-  build(operation: ProcessOperation): Promise<DeltaArtifacts | undefined>;
+  readonly isFallback?: boolean;
+  supports(operation: ResolvedOperation): boolean;
+  build(operation: ResolvedOperation): Promise<DeltaArtifacts | undefined>;
 };

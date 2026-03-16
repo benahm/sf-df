@@ -10,7 +10,7 @@ export class WorkflowStrategy extends XmlCollectionDeltaStrategy {
   public constructor() {
     super({
       name: 'workflow',
-      matcher: (relativePath) => relativePath.startsWith('force-app/main/default/workflows/'),
+      metadataTypes: ['Workflow'],
       rootName: 'Workflow',
       supportsDestructive: true,
       rules: {

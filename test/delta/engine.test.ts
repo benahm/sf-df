@@ -123,6 +123,47 @@ describe('delta engine', () => {
     expect(destructiveLabels).to.contain('<fullName>LabelOne</fullName>');
     expect(destructiveManifest).to.contain('<name>CustomLabels</name>');
   });
+
+  it('applies metadata-specific strategies even when sourceDir is custom', async () => {
+    repoRoot = await setupRepo();
+
+    await writeRepoFile(
+      repoRoot,
+      'pkg/main/default/labels/CustomLabels.labels-meta.xml',
+      '<?xml version="1.0" encoding="UTF-8"?>\n<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">\n  <labels><fullName>LegacyLabel</fullName><value>Legacy</value></labels>\n  <labels><fullName>SharedLabel</fullName><value>Before</value></labels>\n</CustomLabels>\n'
+    );
+
+    runGit(repoRoot, ['add', '.']);
+    runGit(repoRoot, ['commit', '-m', 'base']);
+
+    await writeRepoFile(
+      repoRoot,
+      'pkg/main/default/labels/CustomLabels.labels-meta.xml',
+      '<?xml version="1.0" encoding="UTF-8"?>\n<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">\n  <labels><fullName>SharedLabel</fullName><value>After</value></labels>\n  <labels><fullName>NewLabel</fullName><value>New</value></labels>\n</CustomLabels>\n'
+    );
+
+    const outputDir = path.join(repoRoot, 'tmp-output');
+    await generateDelta({
+      repoRoot,
+      from: 'HEAD',
+      sourceDir: 'pkg/main/default',
+      outputDir,
+    });
+
+    const packageLabels = await readFile(
+      path.join(outputDir, 'package/pkg/main/default/labels/CustomLabels.labels-meta.xml'),
+      'utf8'
+    );
+    const destructiveLabels = await readFile(
+      path.join(outputDir, 'destructive/pkg/main/default/labels/CustomLabels.labels-meta.xml'),
+      'utf8'
+    );
+
+    expect(packageLabels).to.contain('SharedLabel');
+    expect(packageLabels).to.contain('NewLabel');
+    expect(packageLabels).not.to.contain('LegacyLabel');
+    expect(destructiveLabels).to.contain('LegacyLabel');
+  });
 });
 
 describe('diffCompositeXml', () => {

@@ -14,7 +14,7 @@ export class ProfileStrategy extends XmlCollectionDeltaStrategy {
   public constructor() {
     super({
       name: 'profile',
-      matcher: (relativePath) => relativePath.startsWith('force-app/main/default/profiles/'),
+      metadataTypes: ['Profile'],
       rootName: 'Profile',
       alwaysInclude: ['custom', 'description', 'userLicense'],
       rules: {
