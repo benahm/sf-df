@@ -139,10 +139,11 @@ export const generateDelta = async (options: {
   repoRoot: string;
   from: string;
   to?: string;
-  sourceDir: string;
+  sourceDir?: string;
   outputDir: string;
 }): Promise<DeltaResult> => {
-  const snapshotManager = new SnapshotManager(options.repoRoot, options.sourceDir);
+  const sourceDir = (options.sourceDir ?? 'force-app/main/default').replaceAll('\\', '/').replace(/\/+$/, '');
+  const snapshotManager = new SnapshotManager(options.repoRoot, sourceDir);
   const registry = new StrategyRegistry();
   const packageDir = path.join(options.outputDir, 'package');
   const destructiveDir = path.join(options.outputDir, 'destructive');
@@ -164,9 +165,7 @@ export const generateDelta = async (options: {
   await ensureDir(destructiveDir);
 
   const gitChanges = (await getGitChanges(options.repoRoot, options.from, options.to)).filter(
-    (change) =>
-      change.path.startsWith(`${options.sourceDir}/`) ||
-      (change.previousPath?.startsWith(`${options.sourceDir}/`) ?? false)
+    (change) => change.path.startsWith(`${sourceDir}/`) || (change.previousPath?.startsWith(`${sourceDir}/`) ?? false)
   );
 
   const oldSnapshot = await snapshotManager.createFrom(options.from);
@@ -209,7 +208,7 @@ export const generateDelta = async (options: {
   return {
     from: options.from,
     to: options.to,
-    sourceDir: options.sourceDir,
+    sourceDir,
     ...summary,
   };
 };
