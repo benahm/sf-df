@@ -7,10 +7,10 @@ const keyedBy = (fieldName: string): XmlKeyRule => ({
 });
 
 export class WorkflowStrategy extends XmlCollectionDeltaStrategy {
-  public constructor() {
+  public constructor(sourceDir = 'force-app/main/default') {
     super({
       name: 'workflow',
-      matcher: (relativePath) => relativePath.startsWith('force-app/main/default/workflows/'),
+      matcher: (relativePath) => relativePath.startsWith(`${sourceDir}/workflows/`),
       rootName: 'Workflow',
       supportsDestructive: true,
       rules: {

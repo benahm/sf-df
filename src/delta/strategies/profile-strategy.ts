@@ -11,10 +11,10 @@ const layoutKey = (item: Record<string, unknown>): string =>
 // Profiles need stable keys per collection because Salesforce stores many arrays
 // that are semantically sets rather than ordered lists.
 export class ProfileStrategy extends XmlCollectionDeltaStrategy {
-  public constructor() {
+  public constructor(sourceDir = 'force-app/main/default') {
     super({
       name: 'profile',
-      matcher: (relativePath) => relativePath.startsWith('force-app/main/default/profiles/'),
+      matcher: (relativePath) => relativePath.startsWith(`${sourceDir}/profiles/`),
       rootName: 'Profile',
       alwaysInclude: ['custom', 'description', 'userLicense'],
       rules: {
