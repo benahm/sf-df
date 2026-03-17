@@ -88,8 +88,13 @@ export const diffCompositeXml = (
   let hasDeletes = false;
 
   for (const fieldName of alwaysInclude) {
-    if (newRoot[fieldName] !== undefined) {
-      packageContent[fieldName] = newRoot[fieldName];
+    const newValue = newRoot[fieldName];
+    if (newValue !== undefined) {
+      packageContent[fieldName] = newValue;
+    }
+
+    if (stableStringify(oldRoot[fieldName]) !== stableStringify(newValue)) {
+      hasPackageChanges = true;
     }
   }
 

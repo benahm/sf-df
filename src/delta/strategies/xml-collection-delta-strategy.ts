@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 
+import { pathExists } from '../fs.js';
 import { diffCompositeXml, type XmlCollectionRules } from '../xml.js';
 import type { DeltaArtifacts, MetadataDeltaStrategy, ResolvedOperation } from '../types.js';
 
@@ -55,7 +56,7 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
 
     const compareSnapshot = operation.targetSnapshot;
     const comparePath = compareSnapshot ? path.join(compareSnapshot.rootDir, operation.relativePath) : undefined;
-    const compareXml = comparePath ? await readFile(comparePath, 'utf8') : '';
+    const compareXml = comparePath && (await pathExists(comparePath)) ? await readFile(comparePath, 'utf8') : '';
 
     const [oldXml, newXml] = operation.kind === 'package' ? [compareXml, currentXml] : [currentXml, compareXml];
     const diff = diffCompositeXml(oldXml, newXml, this.rootName, this.rules, this.alwaysInclude);
