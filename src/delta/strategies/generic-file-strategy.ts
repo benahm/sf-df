@@ -29,6 +29,17 @@ export class GenericFileStrategy implements MetadataDeltaStrategy {
         };
       }
 
+      // A file such as a field translation is not a component of its own: SDR resolves it to its parent
+      // (the whole object translation), which must not be deleted while it still exists.
+      if (resolved && (await this.isPartOfSurvivingParent(resolved, operation))) {
+        return {
+          dedupeKey: `destructive-part:${operation.relativePath}`,
+          warnings: [
+            `${operation.relativePath} was deleted, but it belongs to ${manifestEntry.type}:${manifestEntry.fullName}, which still exists; the Metadata API cannot remove it on its own, remove it manually in the org if needed.`,
+          ],
+        };
+      }
+
       return {
         dedupeKey: `destructive:${manifestEntry.type}:${manifestEntry.fullName}`,
         destructiveManifestEntries: [manifestEntry],
@@ -72,5 +83,22 @@ export class GenericFileStrategy implements MetadataDeltaStrategy {
         ? [manifestEntry]
         : [{ type: resolved.typeName, fullName: resolved.fullName }],
     };
+  }
+
+  private async isPartOfSurvivingParent(
+    resolved: NonNullable<ResolvedOperation['resolvedMetadata']>,
+    operation: ResolvedOperation['operation']
+  ): Promise<boolean> {
+    const parentXml = resolved.xmlRelativePath;
+    if (
+      resolved.component?.type.strategies?.adapter !== 'decomposed' ||
+      !parentXml ||
+      parentXml === operation.relativePath ||
+      !operation.targetSnapshot
+    ) {
+      return false;
+    }
+
+    return pathExists(path.join(operation.targetSnapshot.rootDir, parentXml));
   }
 }

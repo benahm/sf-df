@@ -8,6 +8,8 @@ export class RecordTypeStrategy extends XmlCollectionDeltaStrategy {
       rootName: 'RecordType',
       alwaysInclude: ['fullName', 'active', 'label', 'businessProcess', 'compactLayoutAssignment'],
       rules: {},
+      // Verified on a sandbox: destructiveChanges fails with "Cannot delete record type through API".
+      deactivateOnDelete: { fieldName: 'active', value: 'false' },
     });
   }
 }

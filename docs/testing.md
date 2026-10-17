@@ -68,6 +68,25 @@ Run with scratch org creation:
 RUN_E2E_ORG=true DEV_HUB_ALIAS=DevOrg SCRATCH_DURATION_DAYS=1 npm run test:e2e:org
 ```
 
+### Metadata lifecycle on a sandbox
+
+`test/e2e-org/metadata-lifecycle.org.e2e.test.ts` replays, on an existing org, the scenario used to harden the command:
+the most common metadata types (Apex, Visualforce, LWC, Aura, custom object and its children, layout, FlexiPage, flow,
+permission set, custom permission, labels, custom metadata, tab, app, quick action, group, sharing rules, workflow,
+email templates, reports, static resources, object and label translations) are added, modified / partially deleted /
+renamed, then deleted. Each delta is deployed in one transaction and the org is retrieved to check it matches the repo.
+
+```bash
+RUN_E2E_ORG=true E2E_TARGET_ORG=<sandbox-alias> npm run test:e2e:org
+```
+
+- Only `SfDfQa*` components are created and the test deletes them; objects get a per-run suffix because deleted
+  objects stay 15 days in the recycle bin.
+- The translation workbench must have `E2E_ORG_LANGUAGE` (default `fr`) enabled.
+- Takes about 15 minutes.
+
+The behaviours it uncovered are pinned by fast unit tests in `test/delta/sandbox-findings.test.ts`.
+
 Useful environment variables:
 
 1. `RUN_E2E_ORG=true`: enable org test execution.

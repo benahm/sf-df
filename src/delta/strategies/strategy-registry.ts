@@ -1,5 +1,6 @@
 import type { MetadataDeltaStrategy } from '../types.js';
 import { CustomLabelsStrategy } from './custom-labels-strategy.js';
+import { FlowStrategy } from './flow-strategy.js';
 import { GenericFileStrategy } from './generic-file-strategy.js';
 import { ProfileStrategy } from './profile-strategy.js';
 import { RecordTypeStrategy } from './record-type-strategy.js';
@@ -21,6 +22,7 @@ export class StrategyRegistry {
       new ProfileStrategy(),
       new RecordTypeStrategy(),
       new TranslationsStrategy(),
+      new FlowStrategy(),
       new GenericFileStrategy(),
     ];
   }

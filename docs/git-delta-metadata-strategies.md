@@ -14,7 +14,8 @@ Le comportement attendu est :
 
 - par défaut, toute metadata modifiée part dans le delta via `GenericFileStrategy` ;
 - seulement les metadata avec des besoins particuliers ont une stratégie dédiée ;
-- une stratégie spécialisée se branche sur le type metadata (`CustomLabels`, `Workflow`, `SharingRules`, `AssignmentRules`, `AutoResponseRules`, `MatchingRules`, `Profile`, `RecordType`, `Translations`) plutôt que sur un chemin figé.
+- une stratégie spécialisée se branche sur le type metadata (`CustomLabels`, `Workflow`, `SharingRules`, `AssignmentRules`, `AutoResponseRules`, `MatchingRules`, `Profile`, `RecordType`, `Translations`, `Flow`) plutôt que sur un chemin figé ;
+- le delta reste minimal : seul ce qui a changé est déployé, plus les fichiers que Salesforce exige (ex. le `.objectTranslation` parent d'une traduction de champ modifiée).
 
 ## Stratégies dérivées du registre SDR
 
@@ -52,7 +53,7 @@ Fichier : [`src/delta/strategies/translations-strategy.ts`](../src/delta/strateg
 - Cible le type metadata `Translations`.
 - Root XML : `Translations`.
 - Diff par nom logique sur les sections comme `customLabels`, `fields`, `layouts`, `recordTypes`, `validationRules`.
-- Ne produit pas de destructive XML partiel ; suppression en manifest-only.
+- N'apparaît jamais dans `destructiveChanges.xml` (`neverDelete`) : les traductions disparaissent avec les composants traduits.
 
 ### `RecordTypeStrategy`
 
@@ -62,7 +63,47 @@ Fichier : [`src/delta/strategies/record-type-strategy.ts`](../src/delta/strategi
 - Root XML : `RecordType`.
 - Réinjecte les singletons requis (`fullName`, `active`, `label`, `businessProcess`, `compactLayoutAssignment`) pour garder un delta déployable.
 - Laisse `diffCompositeXml` inclure automatiquement les autres champs modifiés hors collections déclarées.
-- Ne produit pas de destructive XML partiel ; suppression en manifest-only.
+- Suppression : désactivation (`active=false`), voir les règles vérifiées en sandbox ci-dessous.
+
+### `FlowStrategy`
+
+Fichier : [`src/delta/strategies/flow-strategy.ts`](../src/delta/strategies/flow-strategy.ts)
+
+- Ajout / modification : copie complète via `GenericFileStrategy`.
+- Suppression : un Flow ne peut pas être supprimé par son nom (`insufficient access rights on cross-reference id`),
+  seulement par version (`MonFlow-3`), et les versions n'existent que dans l'org. Le delta déploie donc un
+  `FlowDefinition` avec `activeVersionNumber=0` (désactivation) et émet un warning pour la suppression manuelle.
+
+## Règles de suppression vérifiées en sandbox
+
+Ces règles viennent de déploiements réels (scénario rejouable : `test/e2e-org/metadata-lifecycle.org.e2e.test.ts`).
+Chacune est couverte par `test/delta/sandbox-findings.test.ts`.
+
+| Situation | Ce que Salesforce fait / refuse | Ce que génère le delta |
+| --- | --- | --- |
+| `RecordType` supprimé | `Cannot delete record type through API` | XML avec `active=false` dans `package/` + warning |
+| `RecordType` supprimé avec son objet | `last active record type` si on le désactive | rien : il part avec l'objet |
+| `Flow` supprimé | suppression par nom refusée | `FlowDefinition` `activeVersionNumber=0` + warning |
+| Fichier `Translations` supprimé | la langue entière serait visée | jamais dans `destructiveChanges.xml`, warning |
+| Un fichier `fieldTranslation` supprimé | non adressable seul ; le parent serait supprimé | rien de destructive, warning |
+| `CustomObject` supprimé | lister aussi ses workflows provoque `UNKNOWN_EXCEPTION` | seuls l'objet et ses `QuickAction` sont listés ; champs, list views, layouts, workflows, sharing rules partent en cascade |
+| Un fichier d'un bundle supprimé (LWC, Aura, static resource, site Aura, vue LWR) | le composant existe toujours | redéploiement du bundle, pas de destructive |
+| Une page d'un site LWR supprimée | `DigitalExperience` adressable | destructive de la vue / route seulement |
+| Accès retiré d'un `PermissionSet` | le déploiement **remplace** le permission set | fichier complet (jamais de XML partiel) |
+| `GlobalValueSet` utilisée par un champ supprimé | le champ reste 15 jours dans la corbeille et bloque | rien à faire côté delta : suppression après purge |
+
+## Fichiers qui ne sont pas des metadata
+
+- Le `.forceignore` de chaque ref comparée est appliqué : les fichiers exclus n'entrent pas dans le delta.
+- Un fichier que SDR ne reconnaît pas (`.gitkeep`, `README.md`, `jsconfig.json`...) produit un warning ; il n'interrompt
+  plus le delta et n'est jamais deviné d'après son dossier.
+
+## Gros fichiers XML
+
+`diffCompositeXml` découpe d'abord les deux versions en éléments de premier niveau et écarte ceux qui sont identiques au
+texte près ; seuls les éléments qui diffèrent passent par le parser XML. Un profil de 23 Mo (150 000 permissions de
+champs) passe de 33 s à 1,5 s. Les collections sans règle de clé sont conservées entières dès qu'un élément change, pour
+garder le même résultat qu'un diff complet.
 
 ## Fallback générique
 
@@ -73,7 +114,8 @@ Fichier : [`src/delta/strategies/generic-file-strategy.ts`](../src/delta/strateg
 - Sert de dernière stratégie du registre.
 - Réutilise le metadata déjà résolu par le moteur.
 - Copie tous les fichiers contenus dans le composant résolu.
-- Pour un delete, ajoute seulement l'entrée au manifest destructive.
+- Pour un delete, ajoute seulement l'entrée au manifest destructive, sauf si le fichier supprimé n'est qu'une partie d'un
+  composant décomposé qui existe toujours (ex. `fieldTranslation`) : warning seulement.
 - Exclut les dossiers `__tests__` des bundles LWC (tests Jest non déployables).
 
 Ce fallback couvre aussi les bundles quand le resolver retourne un répertoire complet dans `contentRelativePaths`.

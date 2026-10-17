@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 
 import { pathExists } from '../fs.js';
-import { diffCompositeXml, type XmlCollectionRules } from '../xml.js';
+import { diffCompositeXml, setRootValue, type XmlCollectionRules } from '../xml.js';
 import type { DeltaArtifacts, ManifestEntry, MetadataDeltaStrategy, ResolvedOperation } from '../types.js';
 import type { XmlDiffResult } from '../xml.js';
 
@@ -14,6 +14,23 @@ export type XmlStrategyOptions = {
   alwaysInclude?: string[];
   supportsDestructive?: boolean;
   qualifyChildNames?: boolean;
+  // For types the Metadata API refuses to delete: a deleted file is deployed with this top-level value instead.
+  deactivateOnDelete?: { fieldName: string; value: string };
+  // For types that stand for a whole org setting (a language's Translations): deleting the file must never
+  // reach destructiveChanges.xml.
+  neverDelete?: boolean;
+};
+
+const parentSurvives = async (
+  resolvedMetadata: ResolvedOperation['resolvedMetadata'],
+  operation: ResolvedOperation['operation']
+): Promise<boolean> => {
+  const parentXml = resolvedMetadata?.component?.parent?.xml;
+  if (!parentXml || !operation.targetSnapshot) {
+    return true;
+  }
+
+  return pathExists(path.join(operation.targetSnapshot.rootDir, path.relative(operation.sourceSnapshot.rootDir, parentXml)));
 };
 
 export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
@@ -25,6 +42,8 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
   private readonly alwaysInclude: string[];
   private readonly supportsDestructive: boolean;
   private readonly qualifyChildNames: boolean;
+  private readonly deactivateOnDelete?: XmlStrategyOptions['deactivateOnDelete'];
+  private readonly neverDelete: boolean;
 
   public constructor(options: XmlStrategyOptions) {
     this.name = options.name;
@@ -34,6 +53,8 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
     this.alwaysInclude = options.alwaysInclude ?? [];
     this.supportsDestructive = options.supportsDestructive ?? false;
     this.qualifyChildNames = options.qualifyChildNames ?? false;
+    this.deactivateOnDelete = options.deactivateOnDelete;
+    this.neverDelete = options.neverDelete ?? false;
   }
 
   public supports({ resolvedMetadata, manifestEntry }: ResolvedOperation): boolean {
@@ -41,7 +62,36 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
     return metadataType ? this.metadataTypes.has(metadataType) : false;
   }
 
-  public async build({ operation, manifestEntry }: ResolvedOperation): Promise<DeltaArtifacts | undefined> {
+  public async build({ operation, manifestEntry, resolvedMetadata }: ResolvedOperation): Promise<DeltaArtifacts | undefined> {
+    if (operation.kind === 'destructive' && this.deactivateOnDelete && manifestEntry) {
+      // When the parent (the object of a record type) is deleted too, the child goes away with it.
+      if (!(await parentSurvives(resolvedMetadata, operation))) {
+        return undefined;
+      }
+
+      const { fieldName, value } = this.deactivateOnDelete;
+      const deletedXml = await readFile(path.join(operation.sourceSnapshot.rootDir, operation.relativePath), 'utf8');
+      return {
+        dedupeKey: `${this.name}:deactivate:${manifestEntry.type}:${manifestEntry.fullName}`,
+        packageTextFiles: new Map([[operation.relativePath, setRootValue(deletedXml, this.rootName, fieldName, value)]]),
+        packageManifestEntries: [manifestEntry],
+        warnings: [
+          `${manifestEntry.type}:${manifestEntry.fullName} cannot be deleted through the Metadata API; it is deployed with ${fieldName}=${value} instead. Delete it manually in the org.`,
+        ],
+      };
+    }
+
+    if (operation.kind === 'destructive' && this.neverDelete) {
+      return manifestEntry
+        ? {
+            dedupeKey: `${this.name}:keep:${manifestEntry.type}:${manifestEntry.fullName}`,
+            warnings: [
+              `${operation.relativePath} was deleted; ${manifestEntry.type}:${manifestEntry.fullName} is never deleted from the org, translations go away with the components they translate.`,
+            ],
+          }
+        : undefined;
+    }
+
     if (operation.kind === 'destructive' && !this.supportsDestructive) {
       return manifestEntry
         ? {

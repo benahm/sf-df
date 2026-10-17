@@ -1,6 +1,9 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { ForceIgnore } from '@salesforce/source-deploy-retrieve';
+
+import { dropComponentsOfDeletedObjects } from './destructive-rules.js';
 import { copyFileInto, ensureDir, pathExists } from './fs.js';
 import { getGitChanges } from './git.js';
 import { buildManifestXml, readSourceApiVersion } from './manifest.js';
@@ -15,6 +18,7 @@ import type {
   GitChangeStatus,
   ProcessOperation,
   ResolvedOperation,
+  SnapshotRef,
 } from './types.js';
 
 const emptyCountsByStatus = (): Record<GitChangeStatus, number> => ({
@@ -135,6 +139,17 @@ const resolveOperation = async (operation: ProcessOperation): Promise<ResolvedOp
   };
 };
 
+// Types deployed as a whole folder (LWC, Aura, static resources, Aura sites, LWR site views...).
+// Decomposed types (CustomObjectTranslation...) also own a folder, but their files are separate
+// components and must not trigger a redeploy of the parent.
+const BUNDLE_ADAPTERS = new Set(['bundle', 'mixedContent', 'digitalExperience']);
+
+// Files excluded by the project's .forceignore never reach the delta, as with `sf project deploy`.
+const forceIgnoreOf = (snapshot: SnapshotRef): ((relativePath: string) => boolean) => {
+  const forceIgnore = new ForceIgnore(path.join(snapshot.rootDir, ForceIgnore.FILE_NAME));
+  return (relativePath) => forceIgnore.denies(path.join(snapshot.rootDir, relativePath));
+};
+
 const isInside = (directory: string, targetPath: string): boolean => {
   const relativePath = path.relative(directory, targetPath);
   return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
@@ -146,8 +161,15 @@ const redirectPartialBundleDelete = async (resolved: ResolvedOperation): Promise
   const { operation, resolvedMetadata } = resolved;
   const bundleDir = resolvedMetadata?.component?.content;
   const xmlRelativePath = resolvedMetadata?.xmlRelativePath;
+  const adapter = resolvedMetadata?.component?.type.strategies?.adapter;
 
-  if (operation.kind !== 'destructive' || !operation.targetSnapshot || !bundleDir || !xmlRelativePath) {
+  if (
+    operation.kind !== 'destructive' ||
+    !operation.targetSnapshot ||
+    !bundleDir ||
+    !xmlRelativePath ||
+    !BUNDLE_ADAPTERS.has(adapter ?? '')
+  ) {
     return resolved;
   }
 
@@ -194,12 +216,18 @@ export const generateDelta = async (options: {
   await ensureDir(packageDir);
   await ensureDir(destructiveDir);
 
-  const gitChanges = (await getGitChanges(options.repoRoot, options.from, options.to)).filter(
-    (change) => change.path.startsWith(`${sourceDir}/`) || (change.previousPath?.startsWith(`${sourceDir}/`) ?? false)
-  );
-
   const oldSnapshot = await snapshotManager.createFrom(options.from);
   const newSnapshot = options.to ? await snapshotManager.createFrom(options.to) : snapshotManager.createWorkspace();
+  const isIgnoredInOld = forceIgnoreOf(oldSnapshot);
+  const isIgnoredInNew = forceIgnoreOf(newSnapshot);
+
+  const gitChanges = (await getGitChanges(options.repoRoot, options.from, options.to))
+    .filter(
+      (change) => change.path.startsWith(`${sourceDir}/`) || (change.previousPath?.startsWith(`${sourceDir}/`) ?? false)
+    )
+    .filter((change) =>
+      change.status === 'delete' ? !isIgnoredInOld(change.path) : !isIgnoredInNew(change.path)
+    );
 
   try {
     for (const change of gitChanges) {
@@ -236,7 +264,7 @@ export const generateDelta = async (options: {
     if (destructiveEntries.size > 0) {
       await writeFile(
         summary.destructiveManifestPath!,
-        await buildManifestXml(parseManifestSet(destructiveEntries), apiVersion),
+        await buildManifestXml(dropComponentsOfDeletedObjects(parseManifestSet(destructiveEntries)), apiVersion),
         'utf8'
       );
       // `sf project deploy start --post-destructive-changes` only works alongside --manifest,

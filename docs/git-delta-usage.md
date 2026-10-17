@@ -63,6 +63,8 @@ La commande renvoie un objet `DeltaResult` contenant notamment :
 
 - Les stratégies spécialisées matchent aujourd'hui des chemins codés en dur sous `force-app/main/default/...`.
   `--source-dir` est bien accepté par la commande et utilisé par le moteur, mais les matchers spécialisés restent alignés sur ce layout V1.
-- `Profile` et `Translations` ne produisent pas de destructive XML partiel.
+- `Profile` ne produit pas de destructive XML partiel ; `Translations` n'apparaît jamais dans `destructiveChanges.xml`.
+- Certains types ne peuvent pas être supprimés par l'API (`RecordType`, `Flow` par nom) : ils sont désactivés et un
+  warning demande une suppression manuelle. Voir docs/git-delta-metadata-strategies.md.
 - Le destructive générique repose surtout sur le manifest, pas sur une recopie complète des fichiers supprimés.
 - La qualité du fallback dépend de la capacité du resolver SDR ou du fallback par convention à identifier le type metadata.

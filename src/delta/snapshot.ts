@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -17,10 +17,21 @@ const treeExists = async (cwd: string, ref: string, sourceDir: string): Promise<
   }
 };
 
+// SDR reads .forceignore from the project root, so the snapshot gets the one from the same ref.
+const copyForceIgnore = async (cwd: string, ref: string, tempRoot: string): Promise<void> => {
+  try {
+    const { stdout } = await execFileAsync('git', ['show', `${ref}:.forceignore`], { cwd, encoding: 'buffer' });
+    await writeFile(path.join(tempRoot, '.forceignore'), stdout);
+  } catch {
+    // No .forceignore at this ref.
+  }
+};
+
 // Loads only sourceDir into a throwaway index, then checks it out in a single git process,
 // instead of spawning one `git show` per file.
 const extractGitSnapshot = async (cwd: string, ref: string, sourceDir: string): Promise<string> => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'sf-df-delta-'));
+  await copyForceIgnore(cwd, ref, tempRoot);
 
   // sourceDir may not exist yet at `ref` (first commit of a project): the snapshot is then empty.
   if (!(await treeExists(cwd, ref, sourceDir))) {
@@ -29,8 +40,8 @@ const extractGitSnapshot = async (cwd: string, ref: string, sourceDir: string): 
 
   const env = { ...process.env, GIT_INDEX_FILE: path.join(tempRoot, '.sf-df-index') };
   const prefix = `${tempRoot.replaceAll(path.sep, '/')}/`;
-  await execFileAsync('git', ['read-tree', `--prefix=${sourceDir}/`, `${ref}:${sourceDir}`], { cwd, env });
-  await execFileAsync('git', ['checkout-index', '--all', `--prefix=${prefix}`], { cwd, env });
+  await execFileAsync('git', ['-c', 'core.longpaths=true', 'read-tree', `--prefix=${sourceDir}/`, `${ref}:${sourceDir}`], { cwd, env });
+  await execFileAsync('git', ['-c', 'core.longpaths=true', 'checkout-index', '--all', `--prefix=${prefix}`], { cwd, env });
   await rm(env.GIT_INDEX_FILE, { force: true });
 
   return tempRoot;

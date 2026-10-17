@@ -7,6 +7,16 @@ import type { ManifestEntry, ResolvedMetadataComponent, SnapshotRef } from './ty
 
 const metadataResolver = new MetadataResolver();
 
+// SDR throws on files that are not metadata (.gitkeep, README.md, jsconfig.json...): they must not abort the
+// whole delta, so they resolve to nothing and the caller reports them.
+const resolveComponents = (absolutePath: string): SourceComponent[] => {
+  try {
+    return metadataResolver.getComponentsFromPath(absolutePath);
+  } catch {
+    return [];
+  }
+};
+
 type RegistryType = (typeof registry)['types'][string];
 
 const BUNDLE_DIRECTORIES = new Set(['aura', 'lwc', 'experiences']);
@@ -135,11 +145,11 @@ export const resolveMetadataFromPath = async (
     return buildFallbackResolution(snapshot, relativePath.replace(`${snapshot.sourceDir}/`, ''));
   }
 
-  const resolvedComponents = metadataResolver.getComponentsFromPath(absolutePath);
-  const component = chooseComponent(resolvedComponents, absolutePath);
-
+  // A file SDR does not recognise is not metadata (or is forceignored): guessing a type from its folder
+  // would turn lwc/jsconfig.json into a bogus LightningComponentBundle.
+  const component = chooseComponent(resolveComponents(absolutePath), absolutePath);
   if (!component) {
-    return buildFallbackResolution(snapshot, relativePath.replace(`${snapshot.sourceDir}/`, ''));
+    return undefined;
   }
 
   const contentRelativePaths = unique(
@@ -171,11 +181,8 @@ export const resolveManifestEntry = async (
   const absolutePath = path.join(snapshot.rootDir, relativePath);
 
   if (await pathExists(absolutePath)) {
-    const resolvedComponents = metadataResolver.getComponentsFromPath(absolutePath);
-    const component = chooseComponent(resolvedComponents, absolutePath);
-    if (component) {
-      return getManifestEntry(component);
-    }
+    const component = chooseComponent(resolveComponents(absolutePath), absolutePath);
+    return component ? getManifestEntry(component) : undefined;
   }
 
   const fallback = buildFallbackResolution(snapshot, relativePath.replace(`${snapshot.sourceDir}/`, ''));

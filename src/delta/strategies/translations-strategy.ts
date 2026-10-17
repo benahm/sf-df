@@ -11,6 +11,7 @@ export class TranslationsStrategy extends XmlCollectionDeltaStrategy {
       name: 'translations',
       metadataTypes: ['Translations'],
       rootName: 'Translations',
+      neverDelete: true,
       rules: {
         customApplications: keyedBy('name'),
         customLabels: keyedBy('name'),
