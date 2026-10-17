@@ -34,7 +34,6 @@
     "/lib",
     "/messages",
     "/oclif.manifest.json",
-    "/oclif.lock",
     "/schemas"
   ],
   "keywords": [
@@ -75,7 +74,7 @@
     "lint": "oxlint src test tools --deny-warnings && eslint src test --cache --cache-location .eslintcache",
     "lint:fix": "oxlint src test tools --fix && eslint src test --fix",
     "postpack": "sf-clean --ignore-signing-artifacts",
-    "prepack": "sf-prepack",
+    "prepack": "sf-clean && tsc -p . --pretty && oclif manifest",
     "test": "npm run test:compile && npm run test:only && npm run test:command-reference && npm run test:deprecation-policy && npm run test:json-schema && npm run lint",
     "test-ui": "node tools/test-ui/dev.mjs",
     "test-ui:build": "npm --prefix tools/test-ui/web run build",

@@ -12,15 +12,12 @@ built on the retired `sfdx` CLI. Its behaviour was re-checked against real deplo
 
 ## Install
 
-The plugin is not published on npm yet. Install it from source:
-
 ```bash
-git clone https://github.com/benahm/sf-df.git
-cd sf-df
-bun install        # or npm install
-bun run compile    # or npm run compile
-sf plugins link .
+sf plugins install sf-df@beta
 ```
+
+The plugin is not signed by Salesforce, so `sf` asks you to confirm the installation. In CI, add `sf-df` to
+`~/.config/sf/unsignedPluginAllowList.json` to skip the question. Update with `sf plugins update`.
 
 ## Usage
 
