@@ -230,4 +230,61 @@ describe('mdt:git:delta parity', () => {
     expect(await readFile(result.packageManifestPath, 'utf8')).to.contain('<members>NewName</members>');
     expect(destructiveManifest).to.contain('<members>OldName</members>');
   });
+
+  const lwcBundle = {
+    'lwc/myCmp/myCmp.js': 'export default class MyCmp {}\n',
+    'lwc/myCmp/myCmp.html': '<template></template>\n',
+    'lwc/myCmp/myCmp.css': '.title { color: red; }\n',
+    'lwc/myCmp/myCmp.js-meta.xml': `${XML_HEADER}<LightningComponentBundle ${NS}><apiVersion>61.0</apiVersion></LightningComponentBundle>\n`,
+  };
+
+  it('redeploys an LWC bundle when only one of its files is deleted', async () => {
+    await commitBaseline(lwcBundle);
+    await rm(path.join(repoRoot, SOURCE_DIR, 'lwc/myCmp/myCmp.css'));
+
+    const result = await runDelta();
+
+    expect(await packageHas('lwc/myCmp/myCmp.js')).to.equal(true);
+    expect(await packageHas('lwc/myCmp/myCmp.css')).to.equal(false);
+    expect(await readFile(result.packageManifestPath, 'utf8')).to.contain('<members>myCmp</members>');
+    expect(await exists(result.destructiveManifestPath!)).to.equal(false);
+  });
+
+  it('deletes an LWC bundle when the whole bundle is removed', async () => {
+    await commitBaseline(lwcBundle);
+    await rm(path.join(repoRoot, SOURCE_DIR, 'lwc/myCmp'), { recursive: true });
+
+    const result = await runDelta();
+
+    expect(await readFile(result.destructiveManifestPath!, 'utf8')).to.contain('<members>myCmp</members>');
+    expect(await readFile(result.packageManifestPath, 'utf8')).not.to.contain('<members>myCmp</members>');
+  });
+
+  it('redeploys a folder static resource when one of its files is deleted', async () => {
+    await commitBaseline({
+      'staticresources/assets.resource-meta.xml': `${XML_HEADER}<StaticResource ${NS}><cacheControl>Private</cacheControl><contentType>application/zip</contentType></StaticResource>\n`,
+      'staticresources/assets/css/app.css': 'body { color: red; }\n',
+      'staticresources/assets/js/app.js': 'console.log(1);\n',
+    });
+    await rm(path.join(repoRoot, SOURCE_DIR, 'staticresources/assets/css/app.css'));
+
+    const result = await runDelta();
+
+    expect(await packageHas('staticresources/assets/js/app.js')).to.equal(true);
+    expect(await readFile(result.packageManifestPath, 'utf8')).to.contain('<members>assets</members>');
+    expect(await exists(result.destructiveManifestPath!)).to.equal(false);
+  });
+
+  it('handles a from ref where the source directory does not exist yet', async () => {
+    await writeFile(path.join(repoRoot, 'README.md'), 'empty project\n', 'utf8');
+    runGit(repoRoot, ['add', '.']);
+    runGit(repoRoot, ['commit', '-m', 'base']);
+    await writeRepoFiles(repoRoot, { 'classes/MyClass.cls': 'public class MyClass {}\n' });
+    runGit(repoRoot, ['add', '.']);
+
+    const result = await runDelta();
+
+    expect(await packageHas('classes/MyClass.cls')).to.equal(true);
+    expect(await readFile(result.packageManifestPath, 'utf8')).to.contain('<members>MyClass</members>');
+  });
 });

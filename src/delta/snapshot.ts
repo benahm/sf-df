@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -8,29 +8,30 @@ import type { SnapshotRef } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
+const treeExists = async (cwd: string, ref: string, sourceDir: string): Promise<boolean> => {
+  try {
+    await execFileAsync('git', ['cat-file', '-e', `${ref}:${sourceDir}`], { cwd });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Loads only sourceDir into a throwaway index, then checks it out in a single git process,
+// instead of spawning one `git show` per file.
 const extractGitSnapshot = async (cwd: string, ref: string, sourceDir: string): Promise<string> => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'sf-df-delta-'));
-  const { stdout } = await execFileAsync('git', ['ls-tree', '-r', '--name-only', ref, sourceDir], {
-    cwd,
-    maxBuffer: 20 * 1024 * 1024,
-  });
-  const files = stdout
-    .split(/\r?\n/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
 
-  await Promise.all(
-    files.map(async (relativePath) => {
-      const { stdout: content } = await execFileAsync('git', ['show', `${ref}:${relativePath}`], {
-        cwd,
-        encoding: 'buffer',
-        maxBuffer: 20 * 1024 * 1024,
-      });
-      const destination = path.join(tempRoot, relativePath);
-      await mkdir(path.dirname(destination), { recursive: true });
-      await writeFile(destination, content);
-    })
-  );
+  // sourceDir may not exist yet at `ref` (first commit of a project): the snapshot is then empty.
+  if (!(await treeExists(cwd, ref, sourceDir))) {
+    return tempRoot;
+  }
+
+  const env = { ...process.env, GIT_INDEX_FILE: path.join(tempRoot, '.sf-df-index') };
+  const prefix = `${tempRoot.replaceAll(path.sep, '/')}/`;
+  await execFileAsync('git', ['read-tree', `--prefix=${sourceDir}/`, `${ref}:${sourceDir}`], { cwd, env });
+  await execFileAsync('git', ['checkout-index', '--all', `--prefix=${prefix}`], { cwd, env });
+  await rm(env.GIT_INDEX_FILE, { force: true });
 
   return tempRoot;
 };

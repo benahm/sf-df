@@ -9,6 +9,8 @@ const parseStatus = (rawStatus: string): GitChangeStatus => {
   const statusCode = rawStatus.charAt(0);
   switch (statusCode) {
     case 'A':
+    // A copy leaves its source untouched, so only the new path matters.
+    case 'C':
       return 'add';
     case 'D':
       return 'delete';
@@ -19,33 +21,40 @@ const parseStatus = (rawStatus: string): GitChangeStatus => {
   }
 };
 
+// Renames and copies carry two paths (source then destination); every other status carries one.
+const hasTwoPaths = (rawStatus: string): boolean => rawStatus.startsWith('R') || rawStatus.startsWith('C');
+
 export const getGitChanges = async (cwd: string, from: string, to?: string): Promise<GitChange[]> => {
-  const args = ['-c', 'core.quotePath=false', 'diff', '--name-status', '-M', from];
+  // -z keeps paths verbatim (no quoting) even when they contain tabs, quotes or newlines.
+  const args = ['diff', '--name-status', '-z', '-M', from];
 
   if (to) {
     args.push(to);
   }
 
   const { stdout } = await execFileAsync('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 });
+  const tokens = stdout.split('\0');
+  const changes: GitChange[] = [];
 
-  return stdout
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split('\t'))
-    .flatMap((parts): GitChange[] => {
-      const [rawStatus, firstPath, secondPath] = parts;
-      if (!rawStatus || !firstPath) {
-        return [];
-      }
+  for (let index = 0; index < tokens.length; ) {
+    const rawStatus = tokens[index++];
+    if (!rawStatus) {
+      continue;
+    }
 
-      const status = parseStatus(rawStatus);
-      return [
-        {
-          status,
-          path: status === 'rename' ? secondPath ?? firstPath : firstPath,
-          previousPath: status === 'rename' ? firstPath : undefined,
-        },
-      ];
+    const firstPath = tokens[index++];
+    const secondPath = hasTwoPaths(rawStatus) ? tokens[index++] : undefined;
+    if (!firstPath) {
+      continue;
+    }
+
+    const status = parseStatus(rawStatus);
+    changes.push({
+      status,
+      path: secondPath ?? firstPath,
+      previousPath: status === 'rename' ? firstPath : undefined,
     });
+  }
+
+  return changes;
 };

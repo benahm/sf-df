@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { copyFileInto, ensureDir } from './fs.js';
+import { copyFileInto, ensureDir, pathExists } from './fs.js';
 import { getGitChanges } from './git.js';
 import { buildManifestXml, readSourceApiVersion } from './manifest.js';
 import { resolveManifestEntry, resolveMetadataFromPath } from './metadata-resolver.js';
@@ -135,6 +135,36 @@ const resolveOperation = async (operation: ProcessOperation): Promise<ResolvedOp
   };
 };
 
+const isInside = (directory: string, targetPath: string): boolean => {
+  const relativePath = path.relative(directory, targetPath);
+  return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+};
+
+// Deleting one file of a bundle (LWC, Aura, folder static resource...) changes the bundle, it does not
+// delete it: as long as the bundle still exists on the target side, redeploy it instead.
+const redirectPartialBundleDelete = async (resolved: ResolvedOperation): Promise<ResolvedOperation> => {
+  const { operation, resolvedMetadata } = resolved;
+  const bundleDir = resolvedMetadata?.component?.content;
+  const xmlRelativePath = resolvedMetadata?.xmlRelativePath;
+
+  if (operation.kind !== 'destructive' || !operation.targetSnapshot || !bundleDir || !xmlRelativePath) {
+    return resolved;
+  }
+
+  const deletedPath = path.join(operation.sourceSnapshot.rootDir, operation.relativePath);
+  if (!isInside(bundleDir, deletedPath) || !(await pathExists(path.join(operation.targetSnapshot.rootDir, xmlRelativePath)))) {
+    return resolved;
+  }
+
+  return resolveOperation({
+    change: operation.change,
+    kind: 'package',
+    relativePath: xmlRelativePath,
+    sourceSnapshot: operation.targetSnapshot,
+    targetSnapshot: operation.sourceSnapshot,
+  });
+};
+
 export const generateDelta = async (options: {
   repoRoot: string;
   from: string;
@@ -179,7 +209,7 @@ export const generateDelta = async (options: {
       for (const operation of operations) {
         // Resolve metadata once so strategy selection and generic fallback share the same context.
         // eslint-disable-next-line no-await-in-loop
-        const resolvedOperation = await resolveOperation(operation);
+        const resolvedOperation = await redirectPartialBundleDelete(await resolveOperation(operation));
         const strategy = registry.getStrategy(resolvedOperation);
         // Strategy execution stays sequential so file writes and dedupe decisions remain deterministic.
         // eslint-disable-next-line no-await-in-loop
