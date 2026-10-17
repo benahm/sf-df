@@ -55,7 +55,7 @@ describe('e2e metadata deltas', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const profileDelta = await readFile(
@@ -80,7 +80,7 @@ describe('e2e metadata deltas', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const labelsPackageDelta = await readFile(
@@ -115,7 +115,7 @@ describe('e2e metadata deltas', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const copiedObject = await readFile(

@@ -200,7 +200,7 @@ describe('e2e org: repo-basic fixture', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir: deltaOutputDir,
+      deployDir: path.join(deltaOutputDir, 'package'), destructiveDir: path.join(deltaOutputDir, 'destructive'),
     })) as DeltaResultShape;
     expect(deltaResult.processedChanges).to.be.greaterThan(0);
 

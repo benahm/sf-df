@@ -7,15 +7,16 @@ Commande exposée : [`src/commands/df/git/delta.ts`](../src/commands/df/git/delt
 Exemples :
 
 ```bash
-sf df git delta --from HEAD~1 --output-dir tmp/delta
-sf df git delta --from main --to feature/my-branch --output-dir tmp/delta
+sf df git delta --from HEAD~1 --deploy-dir delta/deploy
+sf df git delta --from main --to feature/my-branch --deploy-dir delta/deploy --destructive-dir delta/destructive
 ```
 
 ## Flags
 
 - `--from`, `-f` : ref git de départ.
 - `--to`, `-t` : ref git de fin. Si absent, le workspace courant est utilisé.
-- `--output-dir`, `-d` : dossier racine des artefacts générés.
+- `--deploy-dir`, `-d` : dossier du package à déployer (alias déprécié : `--packagedir`).
+- `--destructive-dir` : dossier des suppressions (alias déprécié : `--descructivedir`). Par défaut `<deploy-dir>-destructive`, à côté du dossier à déployer. Aucun des deux ne peut être dans l'autre.
 - `--source-dir`, `-s` : dossier source metadata. Défaut : `force-app/main/default`.
 
 ## Structure de sortie
@@ -23,28 +24,27 @@ sf df git delta --from main --to feature/my-branch --output-dir tmp/delta
 Le moteur écrit :
 
 ```text
-<output-dir>/
-  package/
-    package.xml
-    force-app/main/default/...
-  destructive/
-    package.xml                   # vide, requis par `sf project deploy start --post-destructive-changes`
-    destructiveChanges.xml
-    force-app/main/default/...    # seulement pour les metadata qui génèrent un destructive XML partiel
+<deploy-dir>/
+  package.xml
+  force-app/main/default/...
+<destructive-dir>/
+  package.xml                     # vide, requis par `sf project deploy start --post-destructive-changes`
+  destructiveChanges.xml
+  force-app/main/default/...      # seulement pour les metadata qui génèrent un destructive XML partiel
 ```
 
 Selon le type metadata :
 
-- metadata générique : copie des fichiers sources dans `package/` ;
-- metadata XML composite : génération d'un XML partiel dans `package/` ;
-- suppressions partielles supportées : XML partiel dans `destructive/` ;
+- metadata générique : copie des fichiers sources dans `<deploy-dir>` ;
+- metadata XML composite : génération d'un XML partiel dans `<deploy-dir>` ;
+- suppressions partielles supportées : XML partiel dans `<destructive-dir>` ;
 - suppressions non supportées : manifest-only + warning.
 
 Déploiement :
 
 ```bash
-sf project deploy start --source-dir <output-dir>/package/force-app
-sf project deploy start --manifest <output-dir>/destructive/package.xml --post-destructive-changes <output-dir>/destructive/destructiveChanges.xml
+sf project deploy start --source-dir <deploy-dir>/force-app
+sf project deploy start --manifest <destructive-dir>/package.xml --post-destructive-changes <destructive-dir>/destructiveChanges.xml
 ```
 
 ## Résultat JSON

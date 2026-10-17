@@ -28,13 +28,21 @@ Git ref used as the target point.
 
 Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used.
 
-# flags.output-dir.summary
+# flags.deploy-dir.summary
 
-Output directory for generated package and destructive artifacts.
+Directory where the package to deploy is generated.
 
-# flags.output-dir.description
+# flags.deploy-dir.description
 
-The command creates `package/` and `destructive/` beneath this directory and writes manifests there.
+Receives package.xml and the changed source files (partial XML for container metadata). Replaces --packagedir of sfdx mdt:git:delta.
+
+# flags.destructive-dir.summary
+
+Directory where the destructive changes are generated.
+
+# flags.destructive-dir.description
+
+Receives destructiveChanges.xml, the empty package.xml that Salesforce requires to deploy it, and the partial XML of the deleted elements for review. Defaults to the deploy directory followed by "-destructive", next to it. It can't be inside the deploy directory, or the other way round. Replaces --descructivedir of sfdx mdt:git:delta.
 
 # flags.source-dir.summary
 
@@ -64,12 +72,12 @@ Processed %s delta operations.
 
 - Generate a delta against the current workspace:
 
-  <%= config.bin %> <%= command.id %> --from HEAD~1 --output-dir tmp/delta
+  <%= config.bin %> <%= command.id %> --from HEAD~1 --deploy-dir delta/deploy
 
-- Compare two refs and write the package to a target folder:
+- Compare two refs and choose where the destructive changes go:
 
-  <%= config.bin %> <%= command.id %> --from main --to feature/my-branch --output-dir tmp/delta
+  <%= config.bin %> <%= command.id %> --from main --to feature/my-branch --deploy-dir delta/deploy --destructive-dir delta/destructive
 
-- Deploy the generated delta and its destructive changes in one transaction, from the package folder (copy sfdx-project.json there first):
+- Deploy the delta and its destructive changes in one transaction, from the deploy directory (copy sfdx-project.json there first):
 
   <%= config.bin %> project deploy start --manifest package.xml --post-destructive-changes ../destructive/destructiveChanges.xml

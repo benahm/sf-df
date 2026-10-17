@@ -62,7 +62,7 @@ describe('sandbox findings', () => {
   };
 
   const runDelta = (options: { to?: string; from?: string } = {}): Promise<DeltaResult> =>
-    generateDelta({ repoRoot, from: options.from ?? 'HEAD', to: options.to, sourceDir: SOURCE_DIR, outputDir });
+    generateDelta({ repoRoot, from: options.from ?? 'HEAD', to: options.to, sourceDir: SOURCE_DIR, deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive') });
 
   const packageFile = (relativePath: string): string => path.join(outputDir, 'package', SOURCE_DIR, relativePath);
   const destructiveManifest = async (result: DeltaResult): Promise<string> =>

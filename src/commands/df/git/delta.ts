@@ -1,5 +1,3 @@
-import path from 'node:path';
-
 import { Messages } from '@salesforce/core';
 import { Flags, SfCommand } from '@salesforce/sf-plugins-core';
 
@@ -26,11 +24,21 @@ export default class GitDelta extends SfCommand<DeltaResult> {
       summary: messages.getMessage('flags.to.summary'),
       description: messages.getMessage('flags.to.description'),
     }),
-    'output-dir': Flags.directory({
+    'deploy-dir': Flags.directory({
       char: 'd',
       required: true,
-      summary: messages.getMessage('flags.output-dir.summary'),
-      description: messages.getMessage('flags.output-dir.description'),
+      summary: messages.getMessage('flags.deploy-dir.summary'),
+      description: messages.getMessage('flags.deploy-dir.description'),
+      // sfdx mdt:git:delta name, kept so existing pipelines keep working.
+      aliases: ['packagedir'],
+      deprecateAliases: true,
+    }),
+    'destructive-dir': Flags.directory({
+      summary: messages.getMessage('flags.destructive-dir.summary'),
+      description: messages.getMessage('flags.destructive-dir.description'),
+      // sfdx mdt:git:delta name (with its typo), kept so existing pipelines keep working.
+      aliases: ['descructivedir'],
+      deprecateAliases: true,
     }),
     'source-dir': Flags.directory({
       char: 's',
@@ -50,7 +58,8 @@ export default class GitDelta extends SfCommand<DeltaResult> {
         from: flags.from,
         to: flags.to,
         sourceDir: flags['source-dir'],
-        outputDir: path.resolve(flags['output-dir']),
+        deployDir: flags['deploy-dir'],
+        destructiveDir: flags['destructive-dir'],
       });
 
       this.spinner.stop(messages.getMessage('spinner.success'));

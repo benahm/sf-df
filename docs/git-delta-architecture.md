@@ -61,8 +61,8 @@ Pour un renommage, le moteur crée deux opérations :
 
 Chaque opération produit un `DeltaArtifacts` contenant au besoin :
 
-- des copies de fichiers à écrire dans `package/` ;
-- des fichiers XML textuels à écrire dans `package/` ou `destructive/` ;
+- des copies de fichiers à écrire dans le dossier `--deploy-dir` ;
+- des fichiers XML textuels à écrire dans `--deploy-dir` ou `--destructive-dir` ;
 - des entrées de manifest ;
 - des warnings.
 

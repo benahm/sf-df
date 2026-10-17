@@ -2,7 +2,10 @@
     {
         "alias": [],
         "command": "df:git:delta",
-        "flagAliases": [],
+        "flagAliases": [
+            "descructivedir",
+            "packagedir"
+        ],
         "flagChars": [
             "d",
             "f",
@@ -10,10 +13,11 @@
             "t"
         ],
         "flags": [
+            "deploy-dir",
+            "destructive-dir",
             "flags-dir",
             "from",
             "json",
-            "output-dir",
             "source-dir",
             "to"
         ],

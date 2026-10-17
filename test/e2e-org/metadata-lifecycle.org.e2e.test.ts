@@ -39,7 +39,7 @@ describe.skipIf(!enabled)('e2e org: metadata lifecycle', () => {
     expected.forEach((entry) => everDeployed.add(entry));
 
     const outputDir = path.join(repoRoot, `out-${phase}`);
-    const delta = await generateDelta({ repoRoot, from: 'HEAD~1', to: 'HEAD', sourceDir: SOURCE_DIR, outputDir });
+    const delta = await generateDelta({ repoRoot, from: 'HEAD~1', to: 'HEAD', sourceDir: SOURCE_DIR, deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive') });
     const deploy = deployDelta(outputDir, repoRoot, targetOrg!);
     expect(deploy, `${phase} deployment: ${deploy.errorMessage ?? ''} ${deploy.failures.join(' | ')}`).toMatchObject({
       status: 0,

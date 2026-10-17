@@ -125,13 +125,12 @@ Useful environment variables:
 `sf df git delta` writes SFDX source-format output:
 
 ```text
-<output-dir>/
-  package/
-    force-app/main/default/...
-    package.xml
-  destructive/
-    force-app/main/default/...
-    destructiveChanges.xml
+<deploy-dir>/
+  force-app/main/default/...
+  package.xml
+<destructive-dir>/              # default: <deploy-dir>-destructive
+  force-app/main/default/...
+  destructiveChanges.xml
 ```
 
 ## Deploying package vs destructive
@@ -148,7 +147,7 @@ Package-only deploy example:
 ```bash
 sf project deploy start \
   --target-org <org> \
-  --source-dir <delta-output>/package/force-app/main/default \
+  --source-dir <deploy-dir>/force-app/main/default \
   --ignore-conflicts \
   --ignore-warnings \
   --wait 30

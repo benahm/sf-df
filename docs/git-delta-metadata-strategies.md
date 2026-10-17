@@ -81,7 +81,7 @@ Chacune est couverte par `test/delta/sandbox-findings.test.ts`.
 
 | Situation | Ce que Salesforce fait / refuse | Ce que génère le delta |
 | --- | --- | --- |
-| `RecordType` supprimé | `Cannot delete record type through API` | XML avec `active=false` dans `package/` + warning |
+| `RecordType` supprimé | `Cannot delete record type through API` | XML avec `active=false` dans le dossier à déployer + warning |
 | `RecordType` supprimé avec son objet | `last active record type` si on le désactive | rien : il part avec l'objet |
 | `Flow` supprimé | suppression par nom refusée | `FlowDefinition` `activeVersionNumber=0` + warning |
 | Fichier `Translations` supprimé | la langue entière serait visée | jamais dans `destructiveChanges.xml`, warning |

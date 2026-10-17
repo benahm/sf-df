@@ -62,7 +62,7 @@ describe('delta engine', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const copiedClass = await readFile(
@@ -104,7 +104,7 @@ describe('delta engine', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const packageLabels = await readFile(
@@ -148,7 +148,7 @@ describe('delta engine', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'pkg/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const packageLabels = await readFile(
@@ -189,7 +189,7 @@ describe('delta engine', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const recordTypeDelta = await readFile(
@@ -233,7 +233,7 @@ describe('delta engine', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const recordTypeDelta = await readFile(
@@ -271,7 +271,7 @@ describe('delta engine', () => {
       repoRoot,
       from: 'HEAD',
       sourceDir: 'pkg/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const recordTypeDelta = await readFile(
@@ -314,7 +314,7 @@ describe('delta engine', () => {
       from: 'HEAD~1',
       to: 'HEAD',
       sourceDir: 'force-app/main/default',
-      outputDir,
+      deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive'),
     });
 
     const recordTypeDelta = await readFile(

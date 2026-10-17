@@ -42,7 +42,7 @@ describe('mdt:git:delta parity', () => {
     runGit(repoRoot, ['commit', '-m', 'base']);
   };
 
-  const runDelta = (): Promise<DeltaResult> => generateDelta({ repoRoot, from: 'HEAD', sourceDir: SOURCE_DIR, outputDir });
+  const runDelta = (): Promise<DeltaResult> => generateDelta({ repoRoot, from: 'HEAD', sourceDir: SOURCE_DIR, deployDir: path.join(outputDir, 'package'), destructiveDir: path.join(outputDir, 'destructive') });
 
   const readPackage = (relativePath: string): Promise<string> =>
     readFile(path.join(outputDir, 'package', SOURCE_DIR, relativePath), 'utf8');

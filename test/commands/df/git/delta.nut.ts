@@ -44,7 +44,7 @@ describe('df git delta NUTs', () => {
   });
 
   it('writes the package and destructive manifests and returns the result as JSON', () => {
-    const result = execCmd<DeltaResult>('df git delta --from HEAD~1 --to HEAD --output-dir out --json', {
+    const result = execCmd<DeltaResult>('df git delta --from HEAD~1 --to HEAD --deploy-dir deploy --destructive-dir destructive --json', {
       ensureExitCode: 0,
       cwd: repoRoot,
     }).jsonOutput?.result;
@@ -56,7 +56,7 @@ describe('df git delta NUTs', () => {
   });
 
   it('requires --from', () => {
-    const output = execCmd('df git delta --output-dir out', { ensureExitCode: 2, cwd: repoRoot }).shellOutput.stderr;
+    const output = execCmd('df git delta --deploy-dir deploy', { ensureExitCode: 2, cwd: repoRoot }).shellOutput.stderr;
 
     expect(output).to.contain('Missing required flag from');
   });

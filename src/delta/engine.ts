@@ -187,18 +187,37 @@ const redirectPartialBundleDelete = async (resolved: ResolvedOperation): Promise
   });
 };
 
+const contains = (parent: string, child: string): boolean => {
+  const relativePath = path.relative(parent, child);
+  return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+};
+
+// Deploying the deploy folder must never pick up the XML of deleted elements, and the other way round.
+export const resolveOutputDirs = (deployDir: string, destructiveDir?: string): { packageDir: string; destructiveDir: string } => {
+  const packageDir = path.resolve(deployDir);
+  const resolvedDestructiveDir = path.resolve(destructiveDir ?? `${packageDir}-destructive`);
+  if (contains(packageDir, resolvedDestructiveDir) || contains(resolvedDestructiveDir, packageDir)) {
+    throw new Error(
+      `The deploy directory (${packageDir}) and the destructive directory (${resolvedDestructiveDir}) must not contain each other.`
+    );
+  }
+
+  return { packageDir, destructiveDir: resolvedDestructiveDir };
+};
+
 export const generateDelta = async (options: {
   repoRoot: string;
   from: string;
   to?: string;
   sourceDir?: string;
-  outputDir: string;
+  deployDir: string;
+  // Defaults to `<deployDir>-destructive`, next to the deploy folder.
+  destructiveDir?: string;
 }): Promise<DeltaResult> => {
+  const { packageDir, destructiveDir } = resolveOutputDirs(options.deployDir, options.destructiveDir);
   const sourceDir = (options.sourceDir ?? 'force-app/main/default').replaceAll('\\', '/').replace(/\/+$/, '');
   const snapshotManager = new SnapshotManager(options.repoRoot, sourceDir);
   const registry = new StrategyRegistry();
-  const packageDir = path.join(options.outputDir, 'package');
-  const destructiveDir = path.join(options.outputDir, 'destructive');
   const packageEntries = new Set<string>();
   const destructiveEntries = new Set<string>();
   const dedupeKeys = new Set<string>();
