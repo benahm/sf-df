@@ -8,8 +8,8 @@ const execFileAsync = promisify(execFile);
 const parseStatus = (rawStatus: string): GitChangeStatus => {
   const statusCode = rawStatus.charAt(0);
   switch (statusCode) {
-    case 'A':
     // A copy leaves its source untouched, so only the new path matters.
+    case 'A':
     case 'C':
       return 'add';
     case 'D':

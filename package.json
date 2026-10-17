@@ -3,22 +3,28 @@
   "description": "Deltaforce Salesforce CLI plugin",
   "version": "1.0.0",
   "dependencies": {
-    "@oclif/core": "^4",
-    "@salesforce/core": "^8",
-    "@salesforce/sf-plugins-core": "^12",
-    "@salesforce/source-deploy-retrieve": "12.31.21",
+    "@oclif/core": "^5.0.0",
+    "@salesforce/core": "^9.1.11",
+    "@salesforce/sf-plugins-core": "^13.0.4",
+    "@salesforce/source-deploy-retrieve": "^13.6.0",
     "fast-xml-parser": "5.5.3"
   },
   "devDependencies": {
-    "@oclif/plugin-command-snapshot": "^5.1.9",
-    "@salesforce/cli-plugins-testkit": "^5.3.10",
-    "@salesforce/dev-scripts": "^10",
-    "eslint-plugin-sf-plugin": "^1.18.6",
-    "oclif": "^4.14.0",
+    "@oclif/plugin-command-snapshot": "^6.0.2",
+    "@salesforce/cli-plugins-testkit": "^5.3.68",
+    "@salesforce/dev-scripts": "^15.0.0",
+    "@salesforce/plugin-command-reference": "^3.1.134",
+    "@types/chai": "^4.3.17",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^18.19.130",
+    "eslint": "^10.12.0",
+    "eslint-config-salesforce-typescript": "^7.0.0",
+    "eslint-plugin-sf-plugin": "^3.0.0",
+    "oclif": "^5.0.2",
     "oxfmt": "^0.40.0",
     "oxlint": "^1.55.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
+    "typescript": "^6.0.0",
     "vitest": "^4.1.0"
   },
   "engines": {
@@ -28,7 +34,8 @@
     "/lib",
     "/messages",
     "/oclif.manifest.json",
-    "/oclif.lock"
+    "/oclif.lock",
+    "/schemas"
   ],
   "keywords": [
     "force",
@@ -45,7 +52,9 @@
     "bin": "sf",
     "topicSeparator": " ",
     "devPlugins": [
-      "@oclif/plugin-help"
+      "@oclif/plugin-help",
+      "@oclif/plugin-command-snapshot",
+      "@salesforce/plugin-command-reference"
     ],
     "topics": {
       "df": {
@@ -63,17 +72,20 @@
     "format": "oxfmt --write \"src/**/*.{ts,js,tsx,jsx}\" \"test/**/*.{ts,js,tsx,jsx}\" \"tools/**/*.mjs\" \"tools/**/*.js\"",
     "format:check": "oxfmt --check \"src/**/*.{ts,js,tsx,jsx}\" \"test/**/*.{ts,js,tsx,jsx}\" \"tools/**/*.mjs\" \"tools/**/*.js\"",
     "link-check": "node -e \"process.exit(process.env.CI ? 0 : 1)\" || linkinator \"**/*.md\" --skip \"CHANGELOG.md|node_modules|test/|confluence.internal.salesforce.com|my.salesforce.com|%s\" --markdown --retry --directory-listing --verbosity error",
-    "lint": "oxlint src test tools --deny-warnings",
-    "lint:fix": "oxlint src test tools --fix",
+    "lint": "oxlint src test tools --deny-warnings && eslint src test --cache --cache-location .eslintcache",
+    "lint:fix": "oxlint src test tools --fix && eslint src test --fix",
     "postpack": "sf-clean --ignore-signing-artifacts",
     "prepack": "sf-prepack",
-    "test": "npm run test:compile && npm run test:only && npm run lint",
-    "test:nuts": "nyc mocha \"**/*.nut.ts\" --slow 4500 --timeout 600000 --parallel",
-    "test:e2e:local": "node --no-deprecation ./node_modules/vitest/vitest.mjs run --config vitest.e2e-local.config.ts",
-    "test:e2e:org": "node --no-deprecation ./node_modules/vitest/vitest.mjs run --config vitest.e2e-org.config.ts",
+    "test": "npm run test:compile && npm run test:only && npm run test:command-reference && npm run test:deprecation-policy && npm run test:json-schema && npm run lint",
     "test-ui": "node tools/test-ui/dev.mjs",
     "test-ui:build": "npm --prefix tools/test-ui/web run build",
+    "test:command-reference": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./bin/dev.js commandreference:generate --error-on-warnings",
     "test:compile": "tsc -p \"./test\" --pretty",
+    "test:deprecation-policy": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./bin/dev.js snapshot:compare",
+    "test:e2e:local": "node --no-deprecation ./node_modules/vitest/vitest.mjs run --config vitest.e2e-local.config.ts",
+    "test:e2e:org": "node --no-deprecation ./node_modules/vitest/vitest.mjs run --config vitest.e2e-org.config.ts",
+    "test:json-schema": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./bin/dev.js schema:compare",
+    "test:nuts": "nyc mocha \"**/*.nut.ts\" --slow 4500 --timeout 600000 --parallel",
     "test:only": "nyc mocha \"test/**/*.test.ts\"",
     "version": "oclif readme"
   },
@@ -83,5 +95,8 @@
   "exports": "./lib/index.js",
   "type": "module",
   "author": "ahmed",
-  "packageManager": "bun@1.3.10"
+  "bugs": "https://github.com/benahm/sf-df/issues",
+  "packageManager": "bun@1.3.10",
+  "homepage": "https://github.com/benahm/sf-df",
+  "repository": "benahm/sf-df"
 }

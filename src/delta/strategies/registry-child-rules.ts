@@ -1,6 +1,6 @@
 import { registry } from '@salesforce/source-deploy-retrieve';
 
-import type { XmlCollectionRules } from '../xml.js';
+import { textOf, type XmlCollectionRules } from '../xml.js';
 
 type RegistryType = (typeof registry)['types'][string];
 
@@ -26,7 +26,7 @@ export const childCollectionRules = (typeName: string): XmlCollectionRules => {
         return [
           childType.xmlElementName!,
           {
-            keySelector: (item: Record<string, unknown>) => String(item[uniqueIdElement] ?? ''),
+            keySelector: (item: Record<string, unknown>) => textOf(item[uniqueIdElement]),
             supportsDelete: true,
             childType: childType.name,
           },

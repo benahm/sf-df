@@ -1,13 +1,13 @@
 import { expect } from 'chai';
 
 import { ProfileStrategy } from '../../src/delta/strategies/profile-strategy.js';
-import { diffCompositeXml, type XmlCollectionRules } from '../../src/delta/xml.js';
+import { diffCompositeXml, textOf, type XmlCollectionRules } from '../../src/delta/xml.js';
 
 const HEADER = '<?xml version="1.0" encoding="UTF-8"?>\n';
 const NS = 'xmlns="http://soap.sforce.com/2006/04/metadata"';
 
 const keyedBy = (fieldName: string): XmlCollectionRules[string] => ({
-  keySelector: (item) => String(item[fieldName] ?? ''),
+  keySelector: (item) => textOf(item[fieldName]),
   supportsDelete: true,
 });
 

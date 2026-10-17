@@ -6,7 +6,7 @@ import path from 'node:path';
 import { expect } from 'chai';
 
 import { generateDelta } from '../../src/delta/engine.js';
-import { diffCompositeXml } from '../../src/delta/xml.js';
+import { diffCompositeXml, textOf } from '../../src/delta/xml.js';
 
 const runGit = (cwd: string, args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' });
 
@@ -343,7 +343,7 @@ describe('diffCompositeXml', () => {
       newXml,
       'Profile',
       {
-        fieldPermissions: { keySelector: (item) => String(item.field ?? '') },
+        fieldPermissions: { keySelector: (item) => textOf(item.field) },
       },
       ['custom', 'userLicense']
     );

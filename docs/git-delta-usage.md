@@ -15,7 +15,7 @@ sf df git delta --from main --to feature/my-branch --output-dir tmp/delta
 
 - `--from`, `-f` : ref git de départ.
 - `--to`, `-t` : ref git de fin. Si absent, le workspace courant est utilisé.
-- `--output-dir`, `-o` : dossier racine des artefacts générés.
+- `--output-dir`, `-d` : dossier racine des artefacts générés.
 - `--source-dir`, `-s` : dossier source metadata. Défaut : `force-app/main/default`.
 
 ## Structure de sortie

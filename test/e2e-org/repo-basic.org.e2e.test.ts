@@ -25,7 +25,8 @@ const run = (command: string, args: string[], cwd: string): string => {
         stderr ? `STDERR:\n${stderr}` : '',
       ]
         .filter(Boolean)
-        .join('\n')
+        .join('\n'),
+      { cause: error }
     );
   }
 };

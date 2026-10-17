@@ -4,7 +4,14 @@
   },
   "wireit": {
     "test": {
-      "dependencies": ["test:compile", "test:only", "lint"]
+      "dependencies": [
+        "test:compile",
+        "test:only",
+        "test:command-reference",
+        "test:deprecation-policy",
+        "test:json-schema",
+        "lint"
+      ]
     }
   }
 }

@@ -1,8 +1,8 @@
-import type { XmlKeyRule } from '../xml.js';
+import { textOf, type XmlKeyRule } from '../xml.js';
 import { XmlCollectionDeltaStrategy } from './xml-collection-delta-strategy.js';
 
 const keyedBy = (fieldName: string): XmlKeyRule => ({
-  keySelector: (item: Record<string, unknown>) => String(item[fieldName] ?? ''),
+  keySelector: (item: Record<string, unknown>) => textOf(item[fieldName]),
 });
 
 export class TranslationsStrategy extends XmlCollectionDeltaStrategy {

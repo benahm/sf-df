@@ -1,12 +1,12 @@
-import type { XmlKeyRule } from '../xml.js';
+import { textOf, type XmlKeyRule } from '../xml.js';
 import { XmlCollectionDeltaStrategy } from './xml-collection-delta-strategy.js';
 
 const keyedBy = (fieldName: string): XmlKeyRule => ({
-  keySelector: (item: Record<string, unknown>) => String(item[fieldName] ?? ''),
+  keySelector: (item: Record<string, unknown>) => textOf(item[fieldName]),
 });
 
 const layoutKey = (item: Record<string, unknown>): string =>
-  `${String(item.layout ?? '')}::${String(item.recordType ?? '')}`;
+  `${textOf(item.layout)}::${textOf(item.recordType)}`;
 
 // Profiles need stable keys per collection because Salesforce stores many arrays
 // that are semantically sets rather than ordered lists.
@@ -29,7 +29,7 @@ export class ProfileStrategy extends XmlCollectionDeltaStrategy {
         flowAccesses: keyedBy('flow'),
         layoutAssignments: { keySelector: layoutKey },
         loginIpRanges: {
-          keySelector: (item) => `${String(item.startAddress ?? '')}::${String(item.endAddress ?? '')}`,
+          keySelector: (item) => `${textOf(item.startAddress)}::${textOf(item.endAddress)}`,
         },
         objectPermissions: keyedBy('object'),
         pageAccesses: keyedBy('apexPage'),

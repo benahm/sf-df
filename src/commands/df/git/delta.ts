@@ -1,9 +1,7 @@
 import path from 'node:path';
 
-import type { Interfaces } from '@oclif/core';
-import { Flags } from '@salesforce/sf-plugins-core';
 import { Messages } from '@salesforce/core';
-import { SfCommand } from '@salesforce/sf-plugins-core';
+import { Flags, SfCommand } from '@salesforce/sf-plugins-core';
 
 import { generateDelta } from '../../../delta/engine.js';
 import type { DeltaResult } from '../../../delta/types.js';
@@ -16,7 +14,7 @@ export default class GitDelta extends SfCommand<DeltaResult> {
   public static readonly description = messages.getMessage('description');
   public static readonly examples = messages.getMessages('examples');
 
-  public static readonly flags: Interfaces.FlagInput = {
+  public static readonly flags = {
     from: Flags.string({
       char: 'f',
       required: true,
@@ -49,10 +47,10 @@ export default class GitDelta extends SfCommand<DeltaResult> {
     try {
       const result = await generateDelta({
         repoRoot: process.cwd(),
-        from: String(flags.from),
-        to: flags.to ? String(flags.to) : undefined,
-        sourceDir: String(flags['source-dir']),
-        outputDir: path.resolve(String(flags['output-dir'])),
+        from: flags.from,
+        to: flags.to,
+        sourceDir: flags['source-dir'],
+        outputDir: path.resolve(flags['output-dir']),
       });
 
       this.spinner.stop(messages.getMessage('spinner.success'));

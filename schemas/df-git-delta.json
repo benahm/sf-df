@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/DeltaResult",
+  "definitions": {
+    "DeltaResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "sourceDir": {
+          "type": "string"
+        },
+        "packageDir": {
+          "type": "string"
+        },
+        "destructiveDir": {
+          "type": "string"
+        },
+        "packageManifestPath": {
+          "type": "string"
+        },
+        "destructiveManifestPath": {
+          "type": "string"
+        },
+        "processedChanges": {
+          "type": "number"
+        },
+        "countsByStatus": {
+          "type": "object",
+          "properties": {
+            "add": {
+              "type": "number"
+            },
+            "modify": {
+              "type": "number"
+            },
+            "delete": {
+              "type": "number"
+            },
+            "rename": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "add",
+            "modify",
+            "delete",
+            "rename"
+          ],
+          "additionalProperties": false
+        },
+        "countsByStrategy": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "countsByStatus",
+        "countsByStrategy",
+        "from",
+        "packageDir",
+        "packageManifestPath",
+        "processedChanges",
+        "sourceDir",
+        "warnings"
+      ]
+    }
+  }
+}

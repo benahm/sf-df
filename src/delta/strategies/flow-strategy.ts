@@ -14,11 +14,12 @@ const inactiveFlowDefinition = `<?xml version="1.0" encoding="UTF-8"?>
 // therefore deactivated through its FlowDefinition, which always deploys, and reported for manual cleanup.
 export class FlowStrategy implements MetadataDeltaStrategy {
   public readonly name = 'flow';
+  private readonly typeName = 'Flow';
 
   private readonly generic = new GenericFileStrategy();
 
   public supports({ resolvedMetadata, manifestEntry }: ResolvedOperation): boolean {
-    return (resolvedMetadata?.typeName ?? manifestEntry?.type) === 'Flow';
+    return (resolvedMetadata?.typeName ?? manifestEntry?.type) === this.typeName;
   }
 
   public async build(resolved: ResolvedOperation): Promise<DeltaArtifacts | undefined> {

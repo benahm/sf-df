@@ -62,46 +62,10 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
     return metadataType ? this.metadataTypes.has(metadataType) : false;
   }
 
-  public async build({ operation, manifestEntry, resolvedMetadata }: ResolvedOperation): Promise<DeltaArtifacts | undefined> {
-    if (operation.kind === 'destructive' && this.deactivateOnDelete && manifestEntry) {
-      // When the parent (the object of a record type) is deleted too, the child goes away with it.
-      if (!(await parentSurvives(resolvedMetadata, operation))) {
-        return undefined;
-      }
-
-      const { fieldName, value } = this.deactivateOnDelete;
-      const deletedXml = await readFile(path.join(operation.sourceSnapshot.rootDir, operation.relativePath), 'utf8');
-      return {
-        dedupeKey: `${this.name}:deactivate:${manifestEntry.type}:${manifestEntry.fullName}`,
-        packageTextFiles: new Map([[operation.relativePath, setRootValue(deletedXml, this.rootName, fieldName, value)]]),
-        packageManifestEntries: [manifestEntry],
-        warnings: [
-          `${manifestEntry.type}:${manifestEntry.fullName} cannot be deleted through the Metadata API; it is deployed with ${fieldName}=${value} instead. Delete it manually in the org.`,
-        ],
-      };
-    }
-
-    if (operation.kind === 'destructive' && this.neverDelete) {
-      return manifestEntry
-        ? {
-            dedupeKey: `${this.name}:keep:${manifestEntry.type}:${manifestEntry.fullName}`,
-            warnings: [
-              `${operation.relativePath} was deleted; ${manifestEntry.type}:${manifestEntry.fullName} is never deleted from the org, translations go away with the components they translate.`,
-            ],
-          }
-        : undefined;
-    }
-
+  public async build(resolved: ResolvedOperation): Promise<DeltaArtifacts | undefined> {
+    const { operation, manifestEntry } = resolved;
     if (operation.kind === 'destructive' && !this.supportsDestructive) {
-      return manifestEntry
-        ? {
-            dedupeKey: `${this.name}:warning:${manifestEntry.type}:${manifestEntry.fullName}`,
-            warnings: [
-              `${this.name} does not produce partial destructive XML for ${manifestEntry.type}:${manifestEntry.fullName}; manifest-only delete was kept.`,
-            ],
-            destructiveManifestEntries: [manifestEntry],
-          }
-        : undefined;
+      return this.buildFileDeletion(resolved);
     }
 
     const currentSnapshot = operation.sourceSnapshot;
@@ -153,6 +117,51 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
       dedupeKey: `${this.name}:destructive:${operation.relativePath}`,
       destructiveTextFiles: new Map([[operation.relativePath, diff.destructiveXml]]),
       destructiveManifestEntries: this.toDestructiveEntries(diff, manifestEntry),
+    };
+  }
+
+  // A deleted file for a type without partial destructive XML: deactivate it, keep it, or delete it whole.
+  private async buildFileDeletion({
+    operation,
+    manifestEntry,
+    resolvedMetadata,
+  }: ResolvedOperation): Promise<DeltaArtifacts | undefined> {
+    if (!manifestEntry) {
+      return undefined;
+    }
+
+    const component = `${manifestEntry.type}:${manifestEntry.fullName}`;
+    if (this.deactivateOnDelete) {
+      // When the parent (the object of a record type) is deleted too, the child goes away with it.
+      if (!(await parentSurvives(resolvedMetadata, operation))) {
+        return undefined;
+      }
+
+      const { fieldName, value } = this.deactivateOnDelete;
+      const deletedXml = await readFile(path.join(operation.sourceSnapshot.rootDir, operation.relativePath), 'utf8');
+      return {
+        dedupeKey: `${this.name}:deactivate:${component}`,
+        packageTextFiles: new Map([[operation.relativePath, setRootValue(deletedXml, this.rootName, fieldName, value)]]),
+        packageManifestEntries: [manifestEntry],
+        warnings: [
+          `${component} cannot be deleted through the Metadata API; it is deployed with ${fieldName}=${value} instead. Delete it manually in the org.`,
+        ],
+      };
+    }
+
+    if (this.neverDelete) {
+      return {
+        dedupeKey: `${this.name}:keep:${component}`,
+        warnings: [
+          `${operation.relativePath} was deleted; ${component} is never deleted from the org, translations go away with the components they translate.`,
+        ],
+      };
+    }
+
+    return {
+      dedupeKey: `${this.name}:warning:${component}`,
+      warnings: [`${this.name} does not produce partial destructive XML for ${component}; manifest-only delete was kept.`],
+      destructiveManifestEntries: [manifestEntry],
     };
   }
 

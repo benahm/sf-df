@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 export const ensureDir = async (directory: string): Promise<void> => {
@@ -21,8 +21,7 @@ export const copyFileInto = async (
 ): Promise<void> => {
   const destinationPath = path.join(outputRoot, relativeDestinationPath);
   await ensureDir(path.dirname(destinationPath));
-  const content = await readFile(absoluteSourcePath);
-  await writeFile(destinationPath, content);
+  await copyFile(absoluteSourcePath, destinationPath);
 };
 
 export const collectFilesRecursively = async (rootDir: string): Promise<string[]> => {

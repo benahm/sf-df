@@ -27,6 +27,11 @@ const builder = new XMLBuilder({
   suppressBooleanAttributes: false,
 });
 
+// Text of a parsed element, for building collection keys. Values are strings because tag values are not parsed;
+// a nested element is serialised rather than turned into "[object Object]".
+export const textOf = (value: unknown): string =>
+  typeof value === 'string' ? value : value === undefined || value === null ? '' : JSON.stringify(value);
+
 const ensureArray = <T>(value: T | T[] | undefined): T[] => {
   if (value === undefined) {
     return [];
@@ -41,7 +46,7 @@ const sortKeysDeep = (value: unknown): unknown => {
   }
 
   if (value && typeof value === 'object') {
-    return Object.keys(value as Record<string, unknown>)
+    return Object.keys(value)
       .sort()
       .reduce<Record<string, unknown>>(
         (acc, key) => ({
@@ -176,7 +181,9 @@ const keepDifferingElements = (
   const changedUnkeyedTags = new Set(
     [...oldDiffering, ...newDiffering].map((item) => item.tag).filter((tag) => !(tag in rules))
   );
-  const keep = (differing: Set<XmlChunk>) => (item: XmlChunk) =>
+  const keep =
+    (differing: Set<XmlChunk>) =>
+    (item: XmlChunk): boolean =>
     alwaysInclude.includes(item.tag) || changedUnkeyedTags.has(item.tag) || differing.has(item);
   const rebuild = (chunks: XmlChunks, kept: XmlChunk[]): string =>
     `${chunks.prolog}${chunks.rootOpen}${kept.map((item) => item.raw).join('')}${chunks.rootClose}`;

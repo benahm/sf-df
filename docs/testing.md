@@ -1,5 +1,30 @@
 # Testing Guide
 
+## `npm test`: the guardrails
+
+`npm test` runs the same checks as the Salesforce plugin template (`salesforcecli/plugin-template-sf`):
+
+| Script | Checks |
+| --- | --- |
+| `test:compile` | the tests type-check |
+| `test:only` | unit tests (`test/**/*.test.ts`, mocha) |
+| `test:command-reference` | the command help generates without warnings (`@salesforce/plugin-command-reference`) |
+| `test:deprecation-policy` | commands and flags match `command-snapshot.json`: removing or renaming one breaks users |
+| `test:json-schema` | the `--json` result matches `schemas/*.json`: CI pipelines parse it |
+| `lint` | oxlint, then ESLint with `eslint-config-salesforce-typescript` and `eslint-plugin-sf-plugin` |
+
+When a command or its JSON result changes on purpose, regenerate the reference files and commit them:
+
+```bash
+node --loader ts-node/esm --no-warnings=ExperimentalWarning ./bin/dev.js snapshot:generate
+node --loader ts-node/esm --no-warnings=ExperimentalWarning ./bin/dev.js schema:generate
+```
+
+## NUTs
+
+`npm run test:nuts` runs `test/**/*.nut.ts` with `@salesforce/cli-plugins-testkit`: the real command is executed through
+the CLI in a temporary git repository. No org is needed.
+
 ## Test suites
 
 The project has 2 end-to-end test modes:
