@@ -8,6 +8,8 @@ Compare two git states and generate a deployable package with only the changed m
 
 Container metadata (CustomLabels, Workflow, SharingRules, AssignmentRules, AutoResponseRules, MatchingRules, Profile, RecordType, Translations) is written as partial XML containing only the changed elements. Deleted elements are listed by their own type in destructiveChanges.xml.
 
+destructiveChanges.xml never deletes more than what was deleted in git: removing one file of a bundle redeploys the bundle, and a deleted custom object is listed alone because its children are deleted with it. Metadata the Metadata API cannot delete (RecordType, Flow) is deactivated instead, with a warning asking for a manual deletion.
+
 Run the command from the root of the git repository.
 
 # flags.from.summary
@@ -68,8 +70,6 @@ Processed %s delta operations.
 
   <%= config.bin %> <%= command.id %> --from main --to feature/my-branch --output-dir tmp/delta
 
-- Deploy the generated delta, then its destructive changes:
+- Deploy the generated delta and its destructive changes in one transaction, from the package folder (copy sfdx-project.json there first):
 
-  <%= config.bin %> project deploy start --source-dir tmp/delta/package/force-app
-
-  <%= config.bin %> project deploy start --manifest tmp/delta/destructive/package.xml --post-destructive-changes tmp/delta/destructive/destructiveChanges.xml
+  <%= config.bin %> project deploy start --manifest package.xml --post-destructive-changes ../destructive/destructiveChanges.xml

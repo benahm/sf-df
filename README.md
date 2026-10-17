@@ -1,110 +1,155 @@
 # Deltaforce (`sf df`)
 
-Plugin [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) qui génère un **déploiement incrémental** à partir d'un diff git : seules les metadata modifiées sont packagées, et les suppressions produisent un `destructiveChanges.xml`.
+> **Beta.** Deltaforce is still in beta: review the generated delta before deploying it to production, and please
+> [report issues](https://github.com/benahm/sf-df/issues).
 
-Deltaforce remplace la commande `sfdx mdt:git:delta` de [sfdx-mdt-plugin](https://github.com/benahm/sfdx-mdt-plugin), construite sur l'ancienne CLI `sfdx` qui n'est plus supportée.
+A [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) plugin that builds an **incremental deployment
+from a git diff**: only the metadata that changed is packaged, and deletions produce a `destructiveChanges.xml`.
 
-## Installation
+Deltaforce replaces `sfdx mdt:git:delta` from [sfdx-mdt-plugin](https://github.com/benahm/sfdx-mdt-plugin), which was
+built on the retired `sfdx` CLI. Its behaviour was re-checked against real deployments rather than copied: see
+[what was verified on a sandbox](#deletions-verified-on-a-sandbox).
+
+## Install
+
+The plugin is not published on npm yet. Install it from source:
 
 ```bash
-sf plugins install sf-df
+git clone https://github.com/benahm/sf-df.git
+cd sf-df
+bun install        # or npm install
+bun run compile    # or npm run compile
+sf plugins link .
 ```
 
-## Utilisation
+## Usage
 
-À lancer depuis la racine du dépôt git :
+Run the command from the root of the git repository:
 
 ```bash
-# Delta entre le dernier commit et le workspace courant
+# Delta between the last commit and the current workspace
 sf df git delta --from HEAD --output-dir tmp/delta
 
-# Delta entre deux refs
+# Delta between two refs
 sf df git delta --from main --to feature/my-branch --output-dir tmp/delta
 ```
 
 | Flag | Description |
-|---|---|
-| `-f, --from` | Ref git de départ (commit, branche, tag). **Obligatoire.** |
-| `-t, --to` | Ref git d'arrivée. Par défaut : le workspace courant. |
-| `-d, --output-dir` | Dossier de sortie. **Obligatoire.** |
-| `-s, --source-dir` | Dossier des metadata à analyser. Par défaut : `force-app/main/default`. |
-| `--json` | Résultat au format JSON (compteurs par statut et par stratégie, warnings, chemins générés). |
+| --- | --- |
+| `-f, --from` | Starting git ref (commit, branch, tag). **Required.** |
+| `-t, --to` | Target git ref. Defaults to the current workspace. |
+| `-d, --output-dir` | Output folder. **Required.** |
+| `-s, --source-dir` | Metadata folder to inspect. Defaults to `force-app/main/default`. |
+| `--json` | Result as JSON (counts per status and strategy, warnings, generated paths). Its format is pinned by [`schemas/df-git-delta.json`](schemas/df-git-delta.json). |
 
-### Sortie
+Files excluded by the project's `.forceignore` (at each compared ref) are left out of the delta, as with
+`sf project deploy`.
+
+### Output
 
 ```text
 tmp/delta/
   package/
     package.xml
-    force-app/main/default/...       # fichiers modifiés, ou XML partiels
+    force-app/main/default/...       # changed files, or partial XML
   destructive/
-    package.xml                      # vide, requis par --post-destructive-changes
+    package.xml                      # empty, required by --post-destructive-changes
     destructiveChanges.xml
-    force-app/main/default/...       # XML partiels des éléments supprimés (pour revue)
+    force-app/main/default/...       # partial XML of the deleted elements (for review)
 ```
 
-### Déploiement
+### Deploy
+
+Deploy the package and the destructive changes in **one transaction**, from the package folder so that the partial XML
+files are the ones deployed:
 
 ```bash
-sf project deploy start --source-dir tmp/delta/package/force-app
-sf project deploy start --manifest tmp/delta/destructive/package.xml \
-  --post-destructive-changes tmp/delta/destructive/destructiveChanges.xml
+cp sfdx-project.json tmp/delta/package/
+cd tmp/delta/package
+sf project deploy start --manifest package.xml \
+  --post-destructive-changes ../destructive/destructiveChanges.xml
 ```
 
-## Traitement des metadata
+The manifests use `sourceApiVersion` from `sfdx-project.json`.
 
-| Metadata | Comportement |
-|---|---|
-| Toute metadata | Le composant complet est copié (fichier source + `-meta.xml`, ou bundle complet). |
-| LWC | Bundle complet, sans les dossiers `__tests__`. |
-| Aura, Experience bundles, Static resources | Bundle ou dossier complet avec son `-meta.xml`. |
-| Object translations | Dossier de traduction de l'objet, fichier parent inclus. |
-| `CustomLabels`, `Workflow`, `SharingRules`, `AssignmentRules`, `AutoResponseRules`, `MatchingRules` | XML partiel avec uniquement les éléments ajoutés ou modifiés. Les éléments supprimés sont listés par type enfant dans `destructiveChanges.xml` (`CustomLabel`, `WorkflowRule`, `SharingCriteriaRule`…). |
-| `Profile`, `Translations` | XML partiel des éléments ajoutés ou modifiés. Pas de suppression partielle (warning). |
-| `RecordType` | XML partiel en conservant les champs requis (`fullName`, `active`, `label`, `businessProcess`, `compactLayoutAssignment`). |
+## How metadata is handled
 
-La version d'API des manifests est lue dans `sourceApiVersion` de `sfdx-project.json`.
+The delta is **minimal**: only what changed is deployed, plus the files Salesforce requires for the deployment to
+succeed (for example the parent `.objectTranslation` when only a field translation changed).
 
-## Migration depuis `sfdx mdt:git:delta`
+| Metadata | Behaviour |
+| --- | --- |
+| Any metadata | The whole component is copied (source file + `-meta.xml`). |
+| LWC, Aura, static resources, Aura sites (`ExperienceBundle`) | The whole bundle. Deleting one of its files redeploys the bundle instead of deleting it. LWC `__tests__` folders are excluded. |
+| LWR sites (`DigitalExperienceBundle`) | Only the changed or deleted pages (`DigitalExperience`). |
+| Object translations | The changed field translations plus the parent object translation. |
+| `CustomLabels`, `Workflow`, `SharingRules`, `AssignmentRules`, `AutoResponseRules`, `MatchingRules` | Partial XML with only the added or changed elements. Deleted elements are listed by their own type in `destructiveChanges.xml` (`CustomLabel`, `WorkflowRule`, `SharingCriteriaRule`...). |
+| `Profile`, `Translations` | Partial XML with only the added or changed elements. |
+| `RecordType` | Partial XML keeping the required fields (`fullName`, `active`, `label`, `businessProcess`, `compactLayoutAssignment`). |
+| `PermissionSet` | The whole file: deploying a permission set replaces it, so a partial file would revoke the other accesses. |
+
+Large XML files (profiles, translations) are diffed without parsing the unchanged elements: a 23 MB profile takes about
+1.5 s.
+
+### Deletions verified on a sandbox
+
+A single rejected entry makes the whole deployment fail, and `destructiveChanges.xml` must never delete more than what
+was deleted in git. These rules come from real deployments and are covered by tests:
+
+| Deleted in git | Generated delta |
+| --- | --- |
+| A `RecordType` (`Cannot delete record type through API`) | Deployed with `active=false`, plus a warning. |
+| A `Flow` (cannot be deleted by name) | Deactivated through its `FlowDefinition`, plus a warning. |
+| A `Translations` file | Never listed: it would target the whole language. |
+| One field translation | Nothing destructive: the object translation still exists. |
+| A custom object | The object alone (and its quick actions): fields, list views, layouts, workflows and sharing rules are deleted with it. |
+| One file of a bundle | The bundle is redeployed. |
+
+Details: [docs/git-delta-metadata-strategies.md](docs/git-delta-metadata-strategies.md).
+
+## Migrating from `sfdx mdt:git:delta`
 
 | `sfdx mdt:git:delta` | `sf df git delta` |
-|---|---|
+| --- | --- |
 | `-f, --from` | `-f, --from` |
 | `-t, --to` | `-t, --to` |
-| `-p, --packagedir <dir>` | `-d, --output-dir <out>` → le package est dans `<out>/package` |
-| `-d, --descructivedir <dir>` | toujours généré dans `<out>/destructive` |
-| Pas de manifest | `package.xml` et `destructiveChanges.xml` générés |
-| Suppression : fichier supprimé recopié | Suppression : entrée dans `destructiveChanges.xml` |
-
-Exemple de pipeline :
+| `-p, --packagedir <dir>` | `-d, --output-dir <out>`: the package is in `<out>/package` |
+| `-d, --descructivedir <dir>` | always generated in `<out>/destructive` |
+| No manifest | `package.xml` and `destructiveChanges.xml` are generated |
+| Deletion: the deleted file is copied back | Deletion: an entry in `destructiveChanges.xml` |
 
 ```bash
-# avant
+# before
 sfdx mdt:git:delta -f origin/main -p delta -d destructive
-# après
+# after
 sf df git delta -f origin/main -d tmp/delta
 ```
 
-## Développement
+## Development
+
+The project follows the Salesforce plugin template ([`plugin-template-sf`](https://github.com/salesforcecli/plugin-template-sf)).
 
 ```bash
 bun install
-bun run build          # compile + lint
-npm test               # tests unitaires (mocha)
-npm run test:e2e:local # scénarios de bout en bout, sans org
-npm run test:e2e:org   # déploiement réel sur une scratch org
-npm run test-ui        # interface web de pilotage des tests
+bun run build              # compile + lint
+npm test                   # unit tests + Salesforce guardrails (see below)
+npm run test:nuts          # runs the real command through the CLI (no org needed)
+npm run test:e2e:local     # end-to-end scenarios, no org
+RUN_E2E_ORG=true E2E_TARGET_ORG=<sandbox-alias> npm run test:e2e:org   # full metadata lifecycle on a sandbox
 ./bin/dev.js df git delta --from HEAD --output-dir tmp/delta
 ```
 
-Documentation détaillée :
+`npm test` also checks the command help, the command and flag snapshot (`command-snapshot.json`), the JSON result
+schema (`schemas/`) and the Salesforce lint rules (`eslint-plugin-sf-plugin`). See [docs/testing.md](docs/testing.md).
 
-- [Usage et sorties](docs/git-delta-usage.md)
+Documentation:
+
+- [Usage and output](docs/git-delta-usage.md)
 - [Architecture](docs/git-delta-architecture.md)
-- [Stratégies metadata](docs/git-delta-metadata-strategies.md)
-- [Tests](docs/testing.md)
+- [Metadata strategies](docs/git-delta-metadata-strategies.md)
+- [Testing](docs/testing.md)
 
-## Commandes
+## Commands
 
 <!-- commands -->
 * [`sf df git delta`](#sf-df-git-delta)
@@ -137,6 +182,10 @@ DESCRIPTION
   RecordType, Translations) is written as partial XML containing only the changed elements. Deleted elements are listed
   by their own type in destructiveChanges.xml.
 
+  destructiveChanges.xml never deletes more than what was deleted in git: removing one file of a bundle redeploys the
+  bundle, and a deleted custom object is listed alone because its children are deleted with it. Metadata the Metadata
+  API cannot delete (RecordType, Flow) is deactivated instead, with a warning asking for a manual deletion.
+
   Run the command from the root of the git repository.
 
 EXAMPLES
@@ -148,11 +197,11 @@ EXAMPLES
 
     $ sf df git delta --from main --to feature/my-branch --output-dir tmp/delta
 
-  Deploy the generated delta, then its destructive changes:
+  Deploy the generated delta and its destructive changes in one transaction, from the package folder (copy
+  sfdx-project.json there first):
 
-    $ sf project deploy start --source-dir tmp/delta/package/force-app
-    $ sf project deploy start --manifest tmp/delta/destructive/package.xml --post-destructive-changes \
-      tmp/delta/destructive/destructiveChanges.xml
+    $ sf project deploy start --manifest package.xml --post-destructive-changes ^
+      ../destructive/destructiveChanges.xml
 
 FLAG DESCRIPTIONS
   -d, --output-dir=<value>  Output directory for generated package and destructive artifacts.
@@ -171,4 +220,6 @@ FLAG DESCRIPTIONS
 
     Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used.
 ```
+
+_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.1-beta/src/commands/df/git/delta.ts)_
 <!-- commandsstop -->
