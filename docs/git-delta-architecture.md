@@ -49,9 +49,8 @@ Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
 
 ### `manifest.ts`
 
-- Génère `package.xml` et `destructiveChanges.xml` avec `xmlbuilder2`.
-- Groupe les membres par type metadata.
-- Trie types et membres pour une sortie stable.
+- Génère `package.xml` et `destructiveChanges.xml` via `ComponentSet.getPackageXml()` de SDR (même format que `sf`).
+- Utilise `sourceApiVersion` de `sfdx-project.json`, sinon la version d'API embarquée par SDR.
 
 ## Flux de traitement
 
@@ -95,6 +94,5 @@ Ce modèle rend l'ajout d'un nouveau metadata spécifique évolutif :
 
 ## Dépendances clés
 
-- `@salesforce/source-deploy-retrieve` : résolution des metadata Salesforce.
+- `@salesforce/source-deploy-retrieve` : résolution des metadata Salesforce, registre des types enfants, génération des manifests.
 - `fast-xml-parser` : parsing XML.
-- `xmlbuilder2` : génération des manifests XML.

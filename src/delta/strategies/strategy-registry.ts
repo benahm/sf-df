@@ -3,6 +3,7 @@ import { CustomLabelsStrategy } from './custom-labels-strategy.js';
 import { GenericFileStrategy } from './generic-file-strategy.js';
 import { ProfileStrategy } from './profile-strategy.js';
 import { RecordTypeStrategy } from './record-type-strategy.js';
+import { RegistryCollectionStrategy } from './registry-collection-strategy.js';
 import { TranslationsStrategy } from './translations-strategy.js';
 import { WorkflowStrategy } from './workflow-strategy.js';
 
@@ -13,6 +14,10 @@ export class StrategyRegistry {
     this.strategies = [
       new CustomLabelsStrategy(),
       new WorkflowStrategy(),
+      new RegistryCollectionStrategy('sharingRules', 'SharingRules'),
+      new RegistryCollectionStrategy('assignmentRules', 'AssignmentRules'),
+      new RegistryCollectionStrategy('autoResponseRules', 'AutoResponseRules'),
+      new RegistryCollectionStrategy('matchingRules', 'MatchingRules'),
       new ProfileStrategy(),
       new RecordTypeStrategy(),
       new TranslationsStrategy(),

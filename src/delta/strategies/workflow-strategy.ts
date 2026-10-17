@@ -1,28 +1,7 @@
-import type { XmlKeyRule } from '../xml.js';
-import { XmlCollectionDeltaStrategy } from './xml-collection-delta-strategy.js';
+import { RegistryCollectionStrategy } from './registry-collection-strategy.js';
 
-const keyedBy = (fieldName: string): XmlKeyRule => ({
-  keySelector: (item: Record<string, unknown>) => String(item[fieldName] ?? ''),
-  supportsDelete: true,
-});
-
-export class WorkflowStrategy extends XmlCollectionDeltaStrategy {
+export class WorkflowStrategy extends RegistryCollectionStrategy {
   public constructor() {
-    super({
-      name: 'workflow',
-      metadataTypes: ['Workflow'],
-      rootName: 'Workflow',
-      supportsDestructive: true,
-      rules: {
-        alerts: keyedBy('fullName'),
-        assignmentRules: keyedBy('fullName'),
-        fieldUpdates: keyedBy('fullName'),
-        flowActions: keyedBy('fullName'),
-        knowledgePublishes: keyedBy('fullName'),
-        outboundMessages: keyedBy('fullName'),
-        rules: keyedBy('fullName'),
-        tasks: keyedBy('fullName'),
-      },
-    });
+    super('workflow', 'Workflow');
   }
 }

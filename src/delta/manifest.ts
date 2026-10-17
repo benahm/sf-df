@@ -1,32 +1,32 @@
-import { create } from 'xmlbuilder2';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
+import { ComponentSet } from '@salesforce/source-deploy-retrieve';
 
 import type { ManifestEntry } from './types.js';
 
-const API_VERSION = '61.0';
-
-export const buildManifestXml = (entries: ManifestEntry[]): string => {
-  const grouped = new Map<string, Set<string>>();
-
+// SDR validates type names against the metadata registry and writes the manifest the same way `sf` does.
+export const buildManifestXml = async (entries: ManifestEntry[], apiVersion?: string): Promise<string> => {
+  const componentSet = new ComponentSet();
   for (const entry of entries) {
-    if (!grouped.has(entry.type)) {
-      grouped.set(entry.type, new Set<string>());
-    }
-    grouped.get(entry.type)?.add(entry.fullName);
+    componentSet.add({ fullName: entry.fullName, type: entry.type });
   }
 
-  const root = create({ version: '1.0', encoding: 'UTF-8' }).ele('Package', {
-    xmlns: 'http://soap.sforce.com/2006/04/metadata',
-  });
-
-  for (const typeName of [...grouped.keys()].sort()) {
-    const typeElement = root.ele('types');
-    for (const member of [...(grouped.get(typeName) ?? [])].sort()) {
-      typeElement.ele('members').txt(member);
-    }
-    typeElement.ele('name').txt(typeName);
+  if (apiVersion) {
+    componentSet.sourceApiVersion = apiVersion;
   }
 
-  root.ele('version').txt(API_VERSION);
+  return componentSet.getPackageXml();
+};
 
-  return root.end({ prettyPrint: true });
+// Without sourceApiVersion in sfdx-project.json, SDR falls back to the API version it ships with.
+export const readSourceApiVersion = async (repoRoot: string): Promise<string | undefined> => {
+  try {
+    const project = JSON.parse(await readFile(path.join(repoRoot, 'sfdx-project.json'), 'utf8')) as {
+      sourceApiVersion?: string;
+    };
+    return project.sourceApiVersion;
+  } catch {
+    return undefined;
+  }
 };

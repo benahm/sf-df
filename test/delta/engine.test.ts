@@ -121,7 +121,8 @@ describe('delta engine', () => {
     expect(packageLabels).to.contain('LabelThree');
     expect(packageLabels).not.to.contain('<fullName>LabelOne</fullName>');
     expect(destructiveLabels).to.contain('<fullName>LabelOne</fullName>');
-    expect(destructiveManifest).to.contain('<name>CustomLabels</name>');
+    expect(destructiveManifest).to.contain('<name>CustomLabel</name>');
+    expect(destructiveManifest).to.contain('<members>LabelOne</members>');
   });
 
   it('applies metadata-specific strategies even when sourceDir is custom', async () => {

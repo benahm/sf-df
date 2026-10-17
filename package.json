@@ -7,9 +7,7 @@
     "@salesforce/core": "^8",
     "@salesforce/sf-plugins-core": "^12",
     "@salesforce/source-deploy-retrieve": "12.31.21",
-    "fast-glob": "3.3.3",
-    "fast-xml-parser": "5.5.3",
-    "xmlbuilder2": "4.0.3"
+    "fast-xml-parser": "5.5.3"
   },
   "devDependencies": {
     "@oclif/plugin-command-snapshot": "^5.1.9",

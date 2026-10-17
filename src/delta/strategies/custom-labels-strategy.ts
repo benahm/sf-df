@@ -1,18 +1,7 @@
-import { XmlCollectionDeltaStrategy } from './xml-collection-delta-strategy.js';
+import { RegistryCollectionStrategy } from './registry-collection-strategy.js';
 
-export class CustomLabelsStrategy extends XmlCollectionDeltaStrategy {
+export class CustomLabelsStrategy extends RegistryCollectionStrategy {
   public constructor() {
-    super({
-      name: 'customLabels',
-      metadataTypes: ['CustomLabels'],
-      rootName: 'CustomLabels',
-      supportsDestructive: true,
-      rules: {
-        labels: {
-          keySelector: (item) => String(item.fullName ?? ''),
-          supportsDelete: true,
-        },
-      },
-    });
+    super('customLabels', 'CustomLabels');
   }
 }

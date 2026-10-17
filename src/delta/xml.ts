@@ -3,6 +3,8 @@ import { XMLBuilder, XMLParser } from 'fast-xml-parser';
 export type XmlKeyRule = {
   keySelector: (item: Record<string, unknown>) => string;
   supportsDelete?: boolean;
+  // Child metadata type addressed by destructiveChanges.xml when an item of this collection is deleted.
+  childType?: string;
 };
 
 export type XmlCollectionRules = Record<string, XmlKeyRule>;
@@ -64,6 +66,7 @@ const buildRoot = (rootName: string, attributes: Record<string, unknown>, conten
 export type XmlDiffResult = {
   packageXml?: string;
   destructiveXml?: string;
+  deletedItems: Array<{ fieldName: string; key: string }>;
   hasChanges: boolean;
   hasDeletes: boolean;
 };
@@ -84,6 +87,7 @@ export const diffCompositeXml = (
 
   const packageContent: Record<string, unknown> = {};
   const destructiveContent: Record<string, unknown> = {};
+  const deletedKeys: XmlDiffResult['deletedItems'] = [];
   let hasPackageChanges = false;
   let hasDeletes = false;
 
@@ -123,6 +127,7 @@ export const diffCompositeXml = (
       const deletedItems = oldItems.filter((item) => !newMap.has(rule.keySelector(item)));
       if (deletedItems.length > 0) {
         destructiveContent[fieldName] = deletedItems;
+        deletedKeys.push(...deletedItems.map((item) => ({ fieldName, key: rule.keySelector(item) })));
         hasDeletes = true;
       }
     }
@@ -143,6 +148,7 @@ export const diffCompositeXml = (
   return {
     packageXml: hasPackageChanges ? buildRoot(rootName, rootAttributes, packageContent) : undefined,
     destructiveXml: hasDeletes ? buildRoot(rootName, rootAttributes, destructiveContent) : undefined,
+    deletedItems: deletedKeys,
     hasChanges: hasPackageChanges,
     hasDeletes,
   };

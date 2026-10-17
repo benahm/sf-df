@@ -102,7 +102,8 @@ describe('e2e metadata deltas', () => {
     expect(labelsPackageDelta).not.to.contain('<fullName>LabelOne</fullName>');
     expect(labelsPackageDelta.trim()).to.equal(expectedLabels.trim());
     expect(labelsDestructiveDelta).to.contain('<fullName>LabelOne</fullName>');
-    expect(destructiveXml).to.contain('<name>CustomLabels</name>');
+    expect(destructiveXml).to.contain('<name>CustomLabel</name>');
+    expect(destructiveXml).to.contain('<members>LabelOne</members>');
   });
 
   it('copies changed CustomObject metadata into package output', async () => {

@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises';
 
 import { pathExists } from '../fs.js';
 import { diffCompositeXml, type XmlCollectionRules } from '../xml.js';
-import type { DeltaArtifacts, MetadataDeltaStrategy, ResolvedOperation } from '../types.js';
+import type { DeltaArtifacts, ManifestEntry, MetadataDeltaStrategy, ResolvedOperation } from '../types.js';
+import type { XmlDiffResult } from '../xml.js';
 
 export type XmlStrategyOptions = {
   name: string;
@@ -12,6 +13,7 @@ export type XmlStrategyOptions = {
   rules: XmlCollectionRules;
   alwaysInclude?: string[];
   supportsDestructive?: boolean;
+  qualifyChildNames?: boolean;
 };
 
 export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
@@ -22,6 +24,7 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
   private readonly rules: XmlCollectionRules;
   private readonly alwaysInclude: string[];
   private readonly supportsDestructive: boolean;
+  private readonly qualifyChildNames: boolean;
 
   public constructor(options: XmlStrategyOptions) {
     this.name = options.name;
@@ -30,6 +33,7 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
     this.rules = options.rules;
     this.alwaysInclude = options.alwaysInclude ?? [];
     this.supportsDestructive = options.supportsDestructive ?? false;
+    this.qualifyChildNames = options.qualifyChildNames ?? false;
   }
 
   public supports({ resolvedMetadata, manifestEntry }: ResolvedOperation): boolean {
@@ -70,7 +74,7 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
         return {
           dedupeKey: `${this.name}:package:${operation.relativePath}`,
           destructiveTextFiles: new Map([[operation.relativePath, diff.destructiveXml]]),
-          destructiveManifestEntries: [manifestEntry],
+          destructiveManifestEntries: this.toDestructiveEntries(diff, manifestEntry),
         };
       }
 
@@ -81,7 +85,8 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
         destructiveTextFiles: diff.destructiveXml
           ? new Map([[operation.relativePath, diff.destructiveXml]])
           : undefined,
-        destructiveManifestEntries: diff.destructiveXml && manifestEntry ? [manifestEntry] : undefined,
+        destructiveManifestEntries:
+          diff.destructiveXml && manifestEntry ? this.toDestructiveEntries(diff, manifestEntry) : undefined,
       };
     }
 
@@ -97,7 +102,22 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
     return {
       dedupeKey: `${this.name}:destructive:${operation.relativePath}`,
       destructiveTextFiles: new Map([[operation.relativePath, diff.destructiveXml]]),
-      destructiveManifestEntries: [manifestEntry],
+      destructiveManifestEntries: this.toDestructiveEntries(diff, manifestEntry),
     };
+  }
+
+  // Deleted children are listed by their own type (CustomLabel, WorkflowRule, ...) so destructiveChanges.xml
+  // never targets the whole container; collections without a child type keep the parent entry.
+  private toDestructiveEntries(diff: XmlDiffResult, manifestEntry: ManifestEntry): ManifestEntry[] {
+    const childEntries = diff.deletedItems.flatMap(({ fieldName, key }) => {
+      const childType = this.rules[fieldName]?.childType;
+      if (!childType || !key) {
+        return [];
+      }
+
+      return [{ type: childType, fullName: this.qualifyChildNames ? `${manifestEntry.fullName}.${key}` : key }];
+    });
+
+    return childEntries.length > 0 ? childEntries : [manifestEntry];
   }
 }

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { copyFileInto, ensureDir } from './fs.js';
 import { getGitChanges } from './git.js';
-import { buildManifestXml } from './manifest.js';
+import { buildManifestXml, readSourceApiVersion } from './manifest.js';
 import { resolveManifestEntry, resolveMetadataFromPath } from './metadata-resolver.js';
 import { SnapshotManager } from './snapshot.js';
 import { StrategyRegistry } from './strategies/strategy-registry.js';
@@ -196,10 +196,19 @@ export const generateDelta = async (options: {
       }
     }
 
-    await writeFile(summary.packageManifestPath, buildManifestXml(parseManifestSet(packageEntries)), 'utf8');
+    const apiVersion = await readSourceApiVersion(options.repoRoot);
+    await writeFile(
+      summary.packageManifestPath,
+      await buildManifestXml(parseManifestSet(packageEntries), apiVersion),
+      'utf8'
+    );
 
     if (destructiveEntries.size > 0) {
-      await writeFile(summary.destructiveManifestPath!, buildManifestXml(parseManifestSet(destructiveEntries)), 'utf8');
+      await writeFile(
+        summary.destructiveManifestPath!,
+        await buildManifestXml(parseManifestSet(destructiveEntries), apiVersion),
+        'utf8'
+      );
     }
   } finally {
     await snapshotManager.cleanup();

@@ -6,6 +6,10 @@ import type { DeltaArtifacts, MetadataDeltaStrategy, ResolvedOperation } from '.
 
 const toAbsolutePath = (rootDir: string, relativePath: string): string => path.join(rootDir, relativePath);
 
+// Jest tests live inside LWC bundles but are not deployable metadata.
+const isExcludedFromBundle = (typeName: string, relativePath: string): boolean =>
+  typeName === 'LightningComponentBundle' && relativePath.split('/').includes('__tests__');
+
 export class GenericFileStrategy implements MetadataDeltaStrategy {
   public readonly name = 'generic';
   public readonly isFallback = true;
@@ -57,7 +61,9 @@ export class GenericFileStrategy implements MetadataDeltaStrategy {
       })
     );
 
-    const packageFileCopies = new Map<string, string>(packageEntries.flat());
+    const packageFileCopies = new Map<string, string>(
+      packageEntries.flat().filter(([relativePath]) => !isExcludedFromBundle(resolved.typeName, relativePath))
+    );
 
     return {
       dedupeKey: `package:${resolved.typeName}:${resolved.fullName}`,
