@@ -112,6 +112,13 @@ RUN_E2E_ORG=true E2E_TARGET_ORG=<sandbox-alias> npm run test:e2e:org
 
 The behaviours it uncovered are pinned by fast unit tests in `test/delta/sandbox-findings.test.ts`.
 
+### Profile retrieve on a sandbox
+
+`test/e2e-org/profile-retrieve.org.e2e.test.ts` is read only: it retrieves `E2E_ORG_PROFILE` (default `Admin`) with
+`sf project retrieve start` together with `CustomObject:Account` and the Apex classes, then checks that every element of
+that file is found, unchanged and in the same order, in the complete profile written by `sf df profile retrieve`.
+Takes about 2 minutes. See [profile-retrieve.md](profile-retrieve.md).
+
 Useful environment variables:
 
 1. `RUN_E2E_ORG=true`: enable org test execution.

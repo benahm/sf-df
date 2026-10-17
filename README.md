@@ -104,6 +104,39 @@ was deleted in git. These rules come from real deployments and are covered by te
 
 Details: [docs/git-delta-metadata-strategies.md](docs/git-delta-metadata-strategies.md).
 
+## Complete profiles: `sf df profile retrieve`
+
+`sf project retrieve start -m Profile:Admin` only returns the accesses to the components retrieved in the same
+request: on its own, a profile comes back without its field, object, class, layout or tab accesses. `sf df profile
+retrieve` reads each profile with the Metadata API `readMetadata` call, which returns all of them, and writes it in the
+layout of `sf project retrieve start`, so that git only shows real changes.
+
+```bash
+# Overwrite every profile of the project with the complete profile of the org
+sf df profile retrieve --source-dir force-app/main/default/profiles --target-org my-sandbox
+
+# One profile, written into another folder
+sf df profile retrieve --source-dir "force-app/main/default/profiles/Admin.profile-meta.xml" --output-dir retrieved
+```
+
+| Flag | Description |
+| --- | --- |
+| `-d, --source-dir` | Profile file or folder. Only the profiles it contains are retrieved. **Required.** |
+| `-r, --output-dir` | Where to write the profiles. Defaults to overwriting the source files. |
+| `-o, --target-org` | Org to read from. |
+| `--api-version` | Defaults to `sourceApiVersion` of `sfdx-project.json`: the content of a profile depends on it. |
+
+A profile missing from the org is reported and its file is left untouched; the command then exits with 1. On a
+600-profile sandbox, 50 complete profiles (97 MB) take about 2 minutes. Network errors and transient org errors are
+retried 3 times.
+
+The retrieved profile grants access to **every** component of the org, including fields and classes that are not in
+the project (managed packages, changes made directly in the org). Deploying it to an org where one of them is missing
+fails.
+
+Translations need no such command: `sf project retrieve start -m "Translations:*"` and
+`-m "CustomObjectTranslation:Account-fr"` already return complete files, untranslated entries included.
+
 ## Migrating from `sfdx mdt:git:delta`
 
 | `sfdx mdt:git:delta` | `sf df git delta` |
@@ -121,6 +154,21 @@ sfdx mdt:git:delta -f origin/main -p delta -d destructive
 # after
 sf df git delta -f origin/main -d delta --destructive-dir destructive
 ```
+
+## Migrating from `sfdx mdt:profile:retrieve`
+
+| `sfdx mdt:profile:retrieve` | `sf df profile retrieve` |
+| --- | --- |
+| `-p, --sourcepath` | `-d, --source-dir` (`--sourcepath` still works, deprecated) |
+| `-d, --outputdir` | `-r, --output-dir` (`--outputdir` still works, deprecated) |
+| `-u, --targetusername` | `-o, --target-org` |
+| Profile missing from the org: its file was overwritten with an empty profile | The file is left untouched and the command exits with 1 |
+| Profile name cut at the first dot (`Sales v1.2` read as `Sales v1`) | Full name, as `sf project retrieve` names it |
+| Every file of the folder read as a profile | Only profiles are read |
+| Errors logged, exit code 0 | Status per profile, exit code 1 on any failure |
+
+`sfdx mdt:translations:retrieve` has no replacement: it was a plain retrieve of the source files, which
+`sf project retrieve start` does.
 
 ## Development
 
@@ -144,12 +192,14 @@ Documentation:
 - [Usage and output](docs/git-delta-usage.md)
 - [Architecture](docs/git-delta-architecture.md)
 - [Metadata strategies](docs/git-delta-metadata-strategies.md)
+- [Profile retrieve](docs/profile-retrieve.md)
 - [Testing](docs/testing.md)
 
 ## Commands
 
 <!-- commands -->
 * [`sf df git delta`](#sf-df-git-delta)
+* [`sf df profile retrieve`](#sf-df-profile-retrieve)
 
 ## `sf df git delta`
 
@@ -228,5 +278,63 @@ FLAG DESCRIPTIONS
     be inside the deploy directory, or the other way round. Replaces --descructivedir of sfdx mdt:git:delta.
 ```
 
-_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.1-beta/src/commands/df/git/delta.ts)_
+_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.2-beta/src/commands/df/git/delta.ts)_
+
+## `sf df profile retrieve`
+
+Retrieve complete profiles, with every access they grant.
+
+```
+USAGE
+  $ sf df profile retrieve -o <value> -d <value> [--json] [--flags-dir <value>] [--api-version <value>] [-r <value>]
+
+FLAGS
+  -d, --source-dir=<value>   (required) Profile file, or folder containing profiles, to retrieve.
+  -o, --target-org=<value>   (required) Username or alias of the target org. Not required if the `target-org`
+                             configuration variable is already set.
+  -r, --output-dir=<value>   Directory where the retrieved profiles are written.
+      --api-version=<value>  Override the api version used for api requests made by this command
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Retrieve complete profiles, with every access they grant.
+
+  `sf project retrieve start` only returns the parts of a profile that relate to the components retrieved with it:
+  retrieving a profile alone gives its user permissions, but not its field, object, class, page, tab, application or
+  record type accesses. This command reads each profile with the Metadata API readMetadata call, which returns the whole
+  profile, and writes it in the same layout as `sf project retrieve start`.
+
+  Profiles are found in the source file or folder given by --source-dir and are overwritten in place, unless
+  --output-dir is set. A profile that doesn't exist in the org is reported and its file is left untouched.
+
+  The API version is, in order: --api-version, the sourceApiVersion of sfdx-project.json, the org's version. The content
+  of a profile depends on it.
+
+  Replaces sfdx mdt:profile:retrieve.
+
+EXAMPLES
+  Retrieve every profile of the project from the default org, overwriting the files:
+
+    $ sf df profile retrieve --source-dir force-app/main/default/profiles
+
+  Retrieve one profile from a given org into another folder:
+
+    $ sf df profile retrieve --source-dir "force-app/main/default/profiles/Admin.profile-meta.xml" --target-org ^
+      my-sandbox --output-dir retrieved
+
+FLAG DESCRIPTIONS
+  -d, --source-dir=<value>  Profile file, or folder containing profiles, to retrieve.
+
+    Every profile found in this file or folder is retrieved, and only those. Other files are ignored. Replaces
+    --sourcepath of sfdx mdt:profile:retrieve.
+
+  -r, --output-dir=<value>  Directory where the retrieved profiles are written.
+
+    When omitted, the profiles found in --source-dir are overwritten. Replaces --outputdir of sfdx mdt:profile:retrieve.
+```
+
+_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.2-beta/src/commands/df/profile/retrieve.ts)_
 <!-- commandsstop -->

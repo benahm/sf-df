@@ -7,6 +7,8 @@ import { expect } from 'chai';
 
 import { generateDelta } from '../../src/delta/engine.js';
 import type { DeltaResult } from '../../src/delta/types.js';
+import { formatMetadataFile, parseReadMetadataResponse } from '../../src/retrieve/metadata-read.js';
+import { findProfileSources } from '../../src/retrieve/profile-retrieve.js';
 
 // Behaviours found by deploying real deltas to a sandbox (see docs/git-delta-metadata-strategies.md).
 // Each test names the Salesforce error or data loss it prevents.
@@ -300,5 +302,46 @@ describe('sandbox findings', () => {
       expect(deployed).to.contain('<apexClass>A</apexClass>');
       expect(deployed).to.contain('<apexClass>C</apexClass>');
     });
+  });
+});
+
+// Found while building `sf df profile retrieve` on a 600-profile sandbox (API 64.0).
+describe('sandbox findings: profile retrieve', () => {
+  it('readMetadata answers xsi:nil for an unknown profile: it is not an empty profile to write', () => {
+    const response =
+      '<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><soapenv:Body><readMetadataResponse><result><records xsi:nil="true"/></result></readMetadataResponse></soapenv:Body></soapenv:Envelope>';
+
+    expect(parseReadMetadataResponse(response)).to.deep.equal([undefined]);
+  });
+
+  it('the API full name of a profile is its encoded file name ("System Admin %2B Bulk Delete Permission")', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'sf-df-profile-name-'));
+    try {
+      const filePath = path.join(root, 'System Admin %2B Bulk Delete Permission.profile-meta.xml');
+      await writeFile(filePath, `${XML_HEADER}<Profile ${NS}/>\n`, 'utf8');
+
+      expect(findProfileSources(root).map((source) => source.fullName)).to.deep.equal(['System Admin %2B Bulk Delete Permission']);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('the readMetadata record re-indented is byte for byte what sf project retrieve writes', () => {
+    // Excerpt of the Admin profile: readMetadata response body, then the file retrieved by sf project retrieve.
+    const body =
+      '<applicationVisibilities><application>SalesConsole</application><default>false</default><visible>true</visible></applicationVisibilities>' +
+      '<custom>false</custom><userLicense>Salesforce</userLicense>';
+    const retrieved = `${XML_HEADER}<Profile ${NS}>
+    <applicationVisibilities>
+        <application>SalesConsole</application>
+        <default>false</default>
+        <visible>true</visible>
+    </applicationVisibilities>
+    <custom>false</custom>
+    <userLicense>Salesforce</userLicense>
+</Profile>
+`;
+
+    expect(formatMetadataFile('Profile', body)).to.equal(retrieved);
   });
 });

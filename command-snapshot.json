@@ -22,5 +22,27 @@
             "to"
         ],
         "plugin": "sf-df"
+    },
+    {
+        "alias": [],
+        "command": "df:profile:retrieve",
+        "flagAliases": [
+            "outputdir",
+            "sourcepath"
+        ],
+        "flagChars": [
+            "d",
+            "o",
+            "r"
+        ],
+        "flags": [
+            "api-version",
+            "flags-dir",
+            "json",
+            "output-dir",
+            "source-dir",
+            "target-org"
+        ],
+        "plugin": "sf-df"
     }
 ]

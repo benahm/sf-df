@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/ProfileRetrieveResult",
+  "definitions": {
+    "ProfileRetrieveResult": {
+      "type": "object",
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RetrievedProfile"
+          }
+        }
+      },
+      "required": [
+        "profiles"
+      ],
+      "additionalProperties": false
+    },
+    "RetrievedProfile": {
+      "type": "object",
+      "properties": {
+        "fullName": {
+          "type": "string"
+        },
+        "filePath": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/ProfileRetrieveStatus"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fullName",
+        "filePath",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "ProfileRetrieveStatus": {
+      "type": "string",
+      "enum": [
+        "retrieved",
+        "notFound",
+        "failed"
+      ]
+    }
+  }
+}

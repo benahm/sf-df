@@ -7,6 +7,8 @@ import { expect } from 'chai';
 
 import { generateDelta } from '../../src/delta/engine.js';
 import type { DeltaResult } from '../../src/delta/types.js';
+import { retrieveProfiles } from '../../src/retrieve/profile-retrieve.js';
+import { fakeConnection } from '../retrieve/fake-org.js';
 
 // Behaviours carried over from `sfdx mdt:git:delta` (benahm/sfdx-mdt-plugin).
 
@@ -286,5 +288,75 @@ describe('mdt:git:delta parity', () => {
 
     expect(await packageHas('classes/MyClass.cls')).to.equal(true);
     expect(await readFile(result.packageManifestPath, 'utf8')).to.contain('<members>MyClass</members>');
+  });
+});
+
+// Behaviours of `sfdx mdt:profile:retrieve`. mdt read the profile with jsforce readSync and re-serialised it; every
+// deviation below is a bug of mdt that would corrupt the repository or hide a failure.
+describe('mdt:profile:retrieve parity', () => {
+  let root: string;
+  const stub = `${XML_HEADER}<Profile ${NS}/>\n`;
+
+  beforeEach(async () => {
+    root = await mkdtemp(path.join(tmpdir(), 'sf-df-mdt-profile-'));
+    await mkdir(path.join(root, 'profiles'));
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  const profile = async (fileName: string): Promise<string> => {
+    const filePath = path.join(root, 'profiles', fileName);
+    await writeFile(filePath, stub, 'utf8');
+    return filePath;
+  };
+
+  it('retrieves every profile of a folder, or a single profile file', async () => {
+    const admin = await profile('Admin.profile-meta.xml');
+    await profile('Standard.profile-meta.xml');
+    const connection = fakeConnection({ Admin: '<custom>false</custom>', Standard: '<custom>false</custom>' });
+
+    const folder = await retrieveProfiles({ connection, sourcePath: path.join(root, 'profiles') });
+    const file = await retrieveProfiles({ connection, sourcePath: admin });
+
+    expect(folder.profiles.map((item) => item.fullName)).to.deep.equal(['Admin', 'Standard']);
+    expect(file.profiles.map((item) => item.fullName)).to.deep.equal(['Admin']);
+  });
+
+  it('deviation: a profile missing from the org leaves its file untouched (mdt wrote an empty profile over it)', async () => {
+    const ghost = await profile('Ghost.profile-meta.xml');
+
+    const result = await retrieveProfiles({ connection: fakeConnection({}), sourcePath: ghost });
+
+    expect(result.profiles[0].status).to.equal('notFound');
+    expect(await readFile(ghost, 'utf8')).to.equal(stub);
+  });
+
+  it('deviation: the name is the full file name (mdt kept the text before the first dot: "Sales v1.2" became "Sales v1")', async () => {
+    const versioned = await profile('Sales v1.2.profile-meta.xml');
+    const calls: string[][] = [];
+
+    await retrieveProfiles({ connection: fakeConnection({ 'Sales v1.2': '<custom>true</custom>' }, calls), sourcePath: versioned });
+
+    expect(calls).to.deep.equal([['Sales v1.2']]);
+  });
+
+  it('deviation: files that are not profiles are ignored (mdt read every file of the folder as a profile)', async () => {
+    await profile('Admin.profile-meta.xml');
+    await writeFile(path.join(root, 'profiles', 'README.md'), '# profiles\n', 'utf8');
+    const calls: string[][] = [];
+
+    await retrieveProfiles({ connection: fakeConnection({ Admin: '<custom>false</custom>' }, calls), sourcePath: path.join(root, 'profiles') });
+
+    expect(calls).to.deep.equal([['Admin']]);
+  });
+
+  it('deviation: a failed read is reported per profile (mdt logged it and still returned success)', async () => {
+    const admin = await profile('Admin.profile-meta.xml');
+
+    const result = await retrieveProfiles({ connection: fakeConnection({ Admin: new Error('UNKNOWN_EXCEPTION') }), sourcePath: admin });
+
+    expect(result.profiles[0]).to.include({ status: 'failed', error: 'UNKNOWN_EXCEPTION' });
   });
 });
