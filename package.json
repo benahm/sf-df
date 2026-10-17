@@ -97,5 +97,8 @@
   "bugs": "https://github.com/benahm/sf-df/issues",
   "packageManager": "bun@1.3.10",
   "homepage": "https://github.com/benahm/sf-df",
-  "repository": "benahm/sf-df"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benahm/sf-df.git"
+  }
 }
