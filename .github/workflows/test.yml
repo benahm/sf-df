@@ -1,19 +1,25 @@
 name: tests
 on:
   push:
-    branches-ignore: [main]
   workflow_dispatch:
 
 jobs:
-  unit-tests:
-    uses: salesforcecli/github-workflows/.github/workflows/unitTest.yml@main
-  nuts:
-    needs: unit-tests
-    uses: salesforcecli/github-workflows/.github/workflows/nut.yml@main
-    secrets: inherit
+  test:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
       fail-fast: false
-    with:
-      os: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - run: git config --global user.email "ci@example.com" && git config --global user.name "CI"
+      - run: bun install --frozen-lockfile
+      - run: npm run compile
+      - run: npm test
+      - run: npm run test:nuts
