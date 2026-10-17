@@ -278,7 +278,7 @@ FLAG DESCRIPTIONS
     be inside the deploy directory, or the other way round. Replaces --descructivedir of sfdx mdt:git:delta.
 ```
 
-_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.2-beta/src/commands/df/git/delta.ts)_
+_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.3-beta/src/commands/df/git/delta.ts)_
 
 ## `sf df profile retrieve`
 
@@ -336,5 +336,5 @@ FLAG DESCRIPTIONS
     When omitted, the profiles found in --source-dir are overwritten. Replaces --outputdir of sfdx mdt:profile:retrieve.
 ```
 
-_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.2-beta/src/commands/df/profile/retrieve.ts)_
+_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.3-beta/src/commands/df/profile/retrieve.ts)_
 <!-- commandsstop -->

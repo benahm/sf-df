@@ -1,7 +1,7 @@
 {
   "name": "sf-df",
   "description": "Deltaforce Salesforce CLI plugin",
-  "version": "0.0.2-beta",
+  "version": "0.0.3-beta",
   "dependencies": {
     "@oclif/core": "^5.0.0",
     "@salesforce/core": "^9.1.11",
