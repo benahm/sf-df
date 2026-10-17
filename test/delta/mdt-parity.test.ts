@@ -89,6 +89,7 @@ describe('mdt:git:delta parity', () => {
     expect(destructiveManifest).to.contain('<name>SharingCriteriaRule</name>');
     expect(destructiveManifest).to.contain('<members>Account.Removed</members>');
     expect(destructiveManifest).not.to.contain('<name>SharingRules</name>');
+    expect(await readFile(path.join(outputDir, 'destructive/package.xml'), 'utf8')).not.to.contain('<types>');
   });
 
   for (const [typeName, directory, suffix, element] of [

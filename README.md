@@ -1,145 +1,174 @@
-# sf-df
+# Deltaforce (`sf df`)
 
-[![NPM](https://img.shields.io/npm/v/sf-df.svg?label=sf-df)](https://www.npmjs.com/package/sf-df) [![Downloads/week](https://img.shields.io/npm/dw/sf-df.svg)](https://npmjs.org/package/sf-df) [![License](https://img.shields.io/badge/License-BSD%203--Clause-brightgreen.svg)](https://raw.githubusercontent.com/salesforcecli/sf-df/main/LICENSE.txt)
+Plugin [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) qui génère un **déploiement incrémental** à partir d'un diff git : seules les metadata modifiées sont packagées, et les suppressions produisent un `destructiveChanges.xml`.
 
-## Using the template
+Deltaforce remplace la commande `sfdx mdt:git:delta` de [sfdx-mdt-plugin](https://github.com/benahm/sfdx-mdt-plugin), construite sur l'ancienne CLI `sfdx` qui n'est plus supportée.
 
-This repository provides a template for creating a plugin for the Salesforce CLI. To convert this template to a working plugin:
-
-1. Please get in touch with the Platform CLI team. We want to help you develop your plugin.
-2. Generate your plugin:
-
-   ```
-   sf plugins install dev
-   sf dev generate plugin
-
-   git init -b main
-   git add . && git commit -m "chore: initial commit"
-   ```
-
-3. Create your plugin's repo in the salesforcecli github org
-4. When you're ready, replace the contents of this README with the information you want.
-
-## Learn about `sf` plugins
-
-Salesforce CLI plugins are based on the [oclif plugin framework](<(https://oclif.io/docs/introduction.html)>). Read the [plugin developer guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_cli_plugins.meta/sfdx_cli_plugins/cli_plugins_architecture_sf_cli.htm) to learn about Salesforce CLI plugin development.
-
-This repository contains a lot of additional scripts and tools to help with general Salesforce node development and enforce coding standards. You should familiarize yourself with some of the [node developer packages](#tooling) used by Salesforce.
-
-Additionally, there are some additional tests that the Salesforce CLI will enforce if this plugin is ever bundled with the CLI. These test are included by default under the `posttest` script and it is required to keep these tests active in your plugin if you plan to have it bundled.
-
-### Tooling
-
-- [@salesforce/core](https://github.com/forcedotcom/sfdx-core)
-- [@salesforce/kit](https://github.com/forcedotcom/kit)
-- [@salesforce/sf-plugins-core](https://github.com/salesforcecli/sf-plugins-core)
-- [@salesforce/ts-types](https://github.com/forcedotcom/ts-types)
-- [@salesforce/ts-sinon](https://github.com/forcedotcom/ts-sinon)
-- [@salesforce/dev-config](https://github.com/forcedotcom/dev-config)
-- [@salesforce/dev-scripts](https://github.com/forcedotcom/dev-scripts)
-
-### Hooks
-
-For cross clouds commands, e.g. `sf env list`, we utilize [oclif hooks](https://oclif.io/docs/hooks) to get the relevant information from installed plugins.
-
-This plugin includes sample hooks in the [src/hooks directory](src/hooks). You'll just need to add the appropriate logic. You can also delete any of the hooks if they aren't required for your plugin.
-
-# Everything past here is only a suggestion as to what should be in your specific plugin's description
-
-This plugin is bundled with the [Salesforce CLI](https://developer.salesforce.com/tools/sfdxcli). For more information on the CLI, read the [getting started guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_intro.htm).
-
-We always recommend using the latest version of these commands bundled with the CLI, however, you can install a specific version or tag if needed.
-
-## Install
+## Installation
 
 ```bash
-sf plugins install sf-df@x.y.z
+sf plugins install sf-df
 ```
 
-## Issues
+## Utilisation
 
-Please report any issues at https://github.com/forcedotcom/cli/issues
-
-## Contributing
-
-1. Please read our [Code of Conduct](CODE_OF_CONDUCT.md)
-2. Create a new issue before starting your project so that we can keep track of
-   what you are trying to add/fix. That way, we can also offer suggestions or
-   let you know if there is already an effort in progress.
-3. Fork this repository.
-4. [Build the plugin locally](#build)
-5. Create a _topic_ branch in your fork. Note, this step is recommended but technically not required if contributing using a fork.
-6. Edit the code in your fork.
-7. Write appropriate tests for your changes. Try to achieve at least 95% code coverage on any new code. No pull request will be accepted without unit tests.
-8. Sign CLA (see [CLA](#cla) below).
-9. Send us a pull request when you are done. We'll review your code, suggest any needed changes, and merge it in.
-
-### CLA
-
-External contributors will be required to sign a Contributor's License
-Agreement. You can do so by going to https://cla.salesforce.com/sign-cla.
-
-### Build
-
-To build the plugin locally, make sure to have Bun installed and run the following commands:
+À lancer depuis la racine du dépôt git :
 
 ```bash
-# Clone the repository
-git clone git@github.com:salesforcecli/sf-df
+# Delta entre le dernier commit et le workspace courant
+sf df git delta --from HEAD --output-dir tmp/delta
 
-# Install the dependencies and compile
-bun install && bun run build
+# Delta entre deux refs
+sf df git delta --from main --to feature/my-branch --output-dir tmp/delta
 ```
 
-To use your plugin, run using the local `./bin/dev` or `./bin/dev.cmd` file.
+| Flag | Description |
+|---|---|
+| `-f, --from` | Ref git de départ (commit, branche, tag). **Obligatoire.** |
+| `-t, --to` | Ref git d'arrivée. Par défaut : le workspace courant. |
+| `-d, --output-dir` | Dossier de sortie. **Obligatoire.** |
+| `-s, --source-dir` | Dossier des metadata à analyser. Par défaut : `force-app/main/default`. |
+| `--json` | Résultat au format JSON (compteurs par statut et par stratégie, warnings, chemins générés). |
+
+### Sortie
+
+```text
+tmp/delta/
+  package/
+    package.xml
+    force-app/main/default/...       # fichiers modifiés, ou XML partiels
+  destructive/
+    package.xml                      # vide, requis par --post-destructive-changes
+    destructiveChanges.xml
+    force-app/main/default/...       # XML partiels des éléments supprimés (pour revue)
+```
+
+### Déploiement
 
 ```bash
-# Run using local run file.
-./bin/dev df
+sf project deploy start --source-dir tmp/delta/package/force-app
+sf project deploy start --manifest tmp/delta/destructive/package.xml \
+  --post-destructive-changes tmp/delta/destructive/destructiveChanges.xml
 ```
 
-There should be no differences when running via the Salesforce CLI or using the local run file. However, it can be useful to link the plugin to do some additional testing or run your commands from anywhere on your machine.
+## Traitement des metadata
+
+| Metadata | Comportement |
+|---|---|
+| Toute metadata | Le composant complet est copié (fichier source + `-meta.xml`, ou bundle complet). |
+| LWC | Bundle complet, sans les dossiers `__tests__`. |
+| Aura, Experience bundles, Static resources | Bundle ou dossier complet avec son `-meta.xml`. |
+| Object translations | Dossier de traduction de l'objet, fichier parent inclus. |
+| `CustomLabels`, `Workflow`, `SharingRules`, `AssignmentRules`, `AutoResponseRules`, `MatchingRules` | XML partiel avec uniquement les éléments ajoutés ou modifiés. Les éléments supprimés sont listés par type enfant dans `destructiveChanges.xml` (`CustomLabel`, `WorkflowRule`, `SharingCriteriaRule`…). |
+| `Profile`, `Translations` | XML partiel des éléments ajoutés ou modifiés. Pas de suppression partielle (warning). |
+| `RecordType` | XML partiel en conservant les champs requis (`fullName`, `active`, `label`, `businessProcess`, `compactLayoutAssignment`). |
+
+La version d'API des manifests est lue dans `sourceApiVersion` de `sfdx-project.json`.
+
+## Migration depuis `sfdx mdt:git:delta`
+
+| `sfdx mdt:git:delta` | `sf df git delta` |
+|---|---|
+| `-f, --from` | `-f, --from` |
+| `-t, --to` | `-t, --to` |
+| `-p, --packagedir <dir>` | `-d, --output-dir <out>` → le package est dans `<out>/package` |
+| `-d, --descructivedir <dir>` | toujours généré dans `<out>/destructive` |
+| Pas de manifest | `package.xml` et `destructiveChanges.xml` générés |
+| Suppression : fichier supprimé recopié | Suppression : entrée dans `destructiveChanges.xml` |
+
+Exemple de pipeline :
 
 ```bash
-# Link your plugin to the sf cli
-sf plugins link .
-# To verify
-sf plugins
+# avant
+sfdx mdt:git:delta -f origin/main -p delta -d destructive
+# après
+sf df git delta -f origin/main -d tmp/delta
 ```
 
-## Commands
+## Développement
+
+```bash
+bun install
+bun run build          # compile + lint
+npm test               # tests unitaires (mocha)
+npm run test:e2e:local # scénarios de bout en bout, sans org
+npm run test:e2e:org   # déploiement réel sur une scratch org
+npm run test-ui        # interface web de pilotage des tests
+./bin/dev.js df git delta --from HEAD --output-dir tmp/delta
+```
+
+Documentation détaillée :
+
+- [Usage et sorties](docs/git-delta-usage.md)
+- [Architecture](docs/git-delta-architecture.md)
+- [Stratégies metadata](docs/git-delta-metadata-strategies.md)
+- [Tests](docs/testing.md)
+
+## Commandes
 
 <!-- commands -->
+* [`sf df git delta`](#sf-df-git-delta)
 
-- [`sf df`](#sf-df)
+## `sf df git delta`
 
-## `sf df`
-
-Run Deltaforce.
+Generate a Salesforce delta deployment from a git diff.
 
 ```
 USAGE
-  $ sf df [--json] [-n <value>]
+  $ sf df git delta -f <value> -d <value> [--json] [--flags-dir <value>] [-t <value>] [-s <value>]
 
 FLAGS
-  -n, --name=<value>  [default: Deltaforce] Name to include in the Deltaforce output.
+  -d, --output-dir=<value>  (required) Output directory for generated package and destructive artifacts.
+  -f, --from=<value>        (required) Git ref used as the starting point.
+  -s, --source-dir=<value>  [default: force-app/main/default] Metadata source directory to inspect.
+  -t, --to=<value>          Git ref used as the target point.
 
 GLOBAL FLAGS
-  --json  Format output as json.
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
 
 DESCRIPTION
-  Run the root Deltaforce command (`sf df`).
+  Generate a Salesforce delta deployment from a git diff.
 
-  Run the root Deltaforce command (`sf df`).
+  Compare two git states and generate a deployable package with only the changed metadata, plus destructive changes for
+  deleted metadata.
+
+  Container metadata (CustomLabels, Workflow, SharingRules, AssignmentRules, AutoResponseRules, MatchingRules, Profile,
+  RecordType, Translations) is written as partial XML containing only the changed elements. Deleted elements are listed
+  by their own type in destructiveChanges.xml.
+
+  Run the command from the root of the git repository.
 
 EXAMPLES
-  Run the df command:
+  Generate a delta against the current workspace:
 
-    $ sf df
+    $ sf df git delta --from HEAD~1 --output-dir tmp/delta
 
-  Run with a custom name:
+  Compare two refs and write the package to a target folder:
 
-    $ sf df --name Deltaforce
+    $ sf df git delta --from main --to feature/my-branch --output-dir tmp/delta
+
+  Deploy the generated delta, then its destructive changes:
+
+    $ sf project deploy start --source-dir tmp/delta/package/force-app
+    $ sf project deploy start --manifest tmp/delta/destructive/package.xml --post-destructive-changes \
+      tmp/delta/destructive/destructiveChanges.xml
+
+FLAG DESCRIPTIONS
+  -d, --output-dir=<value>  Output directory for generated package and destructive artifacts.
+
+    The command creates `package/` and `destructive/` beneath this directory and writes manifests there.
+
+  -f, --from=<value>  Git ref used as the starting point.
+
+    Commit, tag, or branch used as the base snapshot for the diff.
+
+  -s, --source-dir=<value>  Metadata source directory to inspect.
+
+    Only changes under this directory are included in the delta. Defaults to `force-app/main/default`.
+
+  -t, --to=<value>  Git ref used as the target point.
+
+    Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used.
 ```
-
 <!-- commandsstop -->

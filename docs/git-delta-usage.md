@@ -28,6 +28,7 @@ Le moteur écrit :
     package.xml
     force-app/main/default/...
   destructive/
+    package.xml                   # vide, requis par `sf project deploy start --post-destructive-changes`
     destructiveChanges.xml
     force-app/main/default/...    # seulement pour les metadata qui génèrent un destructive XML partiel
 ```
@@ -38,6 +39,13 @@ Selon le type metadata :
 - metadata XML composite : génération d'un XML partiel dans `package/` ;
 - suppressions partielles supportées : XML partiel dans `destructive/` ;
 - suppressions non supportées : manifest-only + warning.
+
+Déploiement :
+
+```bash
+sf project deploy start --source-dir <output-dir>/package/force-app
+sf project deploy start --manifest <output-dir>/destructive/package.xml --post-destructive-changes <output-dir>/destructive/destructiveChanges.xml
+```
 
 ## Résultat JSON
 

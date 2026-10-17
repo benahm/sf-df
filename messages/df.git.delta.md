@@ -1,10 +1,14 @@
 # summary
 
-Generate a modular Salesforce delta from a git diff.
+Generate a Salesforce delta deployment from a git diff.
 
 # description
 
-Compare two git states and generate a delta package, a destructive manifest, and metadata-specific partial XML when needed.
+Compare two git states and generate a deployable package with only the changed metadata, plus destructive changes for deleted metadata.
+
+Container metadata (CustomLabels, Workflow, SharingRules, AssignmentRules, AutoResponseRules, MatchingRules, Profile, RecordType, Translations) is written as partial XML containing only the changed elements. Deleted elements are listed by their own type in destructiveChanges.xml.
+
+Run the command from the root of the git repository.
 
 # flags.from.summary
 
@@ -36,7 +40,7 @@ Metadata source directory to inspect.
 
 # flags.source-dir.description
 
-Defaults to `force-app/main/default` for the V1 implementation.
+Only changes under this directory are included in the delta. Defaults to `force-app/main/default`.
 
 # spinner.start
 
@@ -63,3 +67,9 @@ Processed %s delta operations.
 - Compare two refs and write the package to a target folder:
 
   <%= config.bin %> <%= command.id %> --from main --to feature/my-branch --output-dir tmp/delta
+
+- Deploy the generated delta, then its destructive changes:
+
+  <%= config.bin %> project deploy start --source-dir tmp/delta/package/force-app
+
+  <%= config.bin %> project deploy start --manifest tmp/delta/destructive/package.xml --post-destructive-changes tmp/delta/destructive/destructiveChanges.xml

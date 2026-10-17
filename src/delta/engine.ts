@@ -209,6 +209,9 @@ export const generateDelta = async (options: {
         await buildManifestXml(parseManifestSet(destructiveEntries), apiVersion),
         'utf8'
       );
+      // `sf project deploy start --post-destructive-changes` only works alongside --manifest,
+      // so the destructive folder ships the empty package.xml that deployment needs.
+      await writeFile(path.join(destructiveDir, 'package.xml'), await buildManifestXml([], apiVersion), 'utf8');
     }
   } finally {
     await snapshotManager.cleanup();
