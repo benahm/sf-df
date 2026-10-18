@@ -25,6 +25,44 @@
     },
     {
         "alias": [],
+        "command": "df:git:merge-driver:install",
+        "flagAliases": [],
+        "flagChars": [],
+        "flags": [
+            "flags-dir",
+            "json"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
+        "command": "df:git:merge-driver:run",
+        "flagAliases": [],
+        "flagChars": [],
+        "flags": [
+            "ancestor",
+            "current",
+            "flags-dir",
+            "json",
+            "marker-size",
+            "other",
+            "path"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
+        "command": "df:git:merge-driver:uninstall",
+        "flagAliases": [],
+        "flagChars": [],
+        "flags": [
+            "flags-dir",
+            "json"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
         "command": "df:profile:retrieve",
         "flagAliases": [
             "outputdir",

@@ -1,9 +1,20 @@
-import { textOf, type XmlKeyRule } from '../xml.js';
+import { keyedCollectionRules } from '../xml.js';
 import { XmlCollectionDeltaStrategy } from './xml-collection-delta-strategy.js';
 
-const keyedBy = (fieldName: string): XmlKeyRule => ({
-  keySelector: (item: Record<string, unknown>) => textOf(item[fieldName]),
-});
+export const TRANSLATIONS_COLLECTION_KEYS: Record<string, string[]> = {
+  customApplications: ['name'],
+  customLabels: ['name'],
+  customTabs: ['name'],
+  fields: ['name'],
+  flowDefinitions: ['name'],
+  layouts: ['layout'],
+  picklistValues: ['masterLabel'],
+  quickActions: ['name'],
+  recordTypes: ['name'],
+  reportTypes: ['name'],
+  validationRules: ['name'],
+  webLinks: ['name'],
+};
 
 export class TranslationsStrategy extends XmlCollectionDeltaStrategy {
   public constructor() {
@@ -12,20 +23,7 @@ export class TranslationsStrategy extends XmlCollectionDeltaStrategy {
       metadataTypes: ['Translations'],
       rootName: 'Translations',
       neverDelete: true,
-      rules: {
-        customApplications: keyedBy('name'),
-        customLabels: keyedBy('name'),
-        customTabs: keyedBy('name'),
-        fields: keyedBy('name'),
-        flowDefinitions: keyedBy('name'),
-        layouts: keyedBy('layout'),
-        picklistValues: keyedBy('masterLabel'),
-        quickActions: keyedBy('name'),
-        recordTypes: keyedBy('name'),
-        reportTypes: keyedBy('name'),
-        validationRules: keyedBy('name'),
-        webLinks: keyedBy('name'),
-      },
+      rules: keyedCollectionRules(TRANSLATIONS_COLLECTION_KEYS),
     });
   }
 }

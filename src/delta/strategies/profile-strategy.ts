@@ -1,15 +1,28 @@
-import { textOf, type XmlKeyRule } from '../xml.js';
+import { keyedCollectionRules } from '../xml.js';
 import { XmlCollectionDeltaStrategy } from './xml-collection-delta-strategy.js';
 
-const keyedBy = (fieldName: string): XmlKeyRule => ({
-  keySelector: (item: Record<string, unknown>) => textOf(item[fieldName]),
-});
+// Elements that identify each item of a collection. Salesforce stores many arrays that are semantically sets
+// rather than ordered lists; a key made of several elements joins them with "::".
+export const PROFILE_COLLECTION_KEYS: Record<string, string[]> = {
+  applicationVisibilities: ['application'],
+  categoryGroupVisibilities: ['dataCategoryGroup'],
+  classAccesses: ['apexClass'],
+  customMetadataTypeAccesses: ['name'],
+  customPermissions: ['name'],
+  customSettingAccesses: ['name'],
+  externalDataSourceAccesses: ['externalDataSource'],
+  fieldPermissions: ['field'],
+  flowAccesses: ['flow'],
+  layoutAssignments: ['layout', 'recordType'],
+  loginIpRanges: ['startAddress', 'endAddress'],
+  objectPermissions: ['object'],
+  pageAccesses: ['apexPage'],
+  profileActionOverrides: ['actionName'],
+  recordTypeVisibilities: ['recordType'],
+  tabVisibilities: ['tab'],
+  userPermissions: ['name'],
+};
 
-const layoutKey = (item: Record<string, unknown>): string =>
-  `${textOf(item.layout)}::${textOf(item.recordType)}`;
-
-// Profiles need stable keys per collection because Salesforce stores many arrays
-// that are semantically sets rather than ordered lists.
 export class ProfileStrategy extends XmlCollectionDeltaStrategy {
   public constructor() {
     super({
@@ -17,27 +30,7 @@ export class ProfileStrategy extends XmlCollectionDeltaStrategy {
       metadataTypes: ['Profile'],
       rootName: 'Profile',
       alwaysInclude: ['custom', 'description', 'userLicense'],
-      rules: {
-        applicationVisibilities: keyedBy('application'),
-        categoryGroupVisibilities: keyedBy('dataCategoryGroup'),
-        classAccesses: keyedBy('apexClass'),
-        customMetadataTypeAccesses: keyedBy('name'),
-        customPermissions: keyedBy('name'),
-        customSettingAccesses: keyedBy('name'),
-        externalDataSourceAccesses: keyedBy('externalDataSource'),
-        fieldPermissions: keyedBy('field'),
-        flowAccesses: keyedBy('flow'),
-        layoutAssignments: { keySelector: layoutKey },
-        loginIpRanges: {
-          keySelector: (item) => `${textOf(item.startAddress)}::${textOf(item.endAddress)}`,
-        },
-        objectPermissions: keyedBy('object'),
-        pageAccesses: keyedBy('apexPage'),
-        profileActionOverrides: keyedBy('actionName'),
-        recordTypeVisibilities: keyedBy('recordType'),
-        tabVisibilities: keyedBy('tab'),
-        userPermissions: keyedBy('name'),
-      },
+      rules: keyedCollectionRules(PROFILE_COLLECTION_KEYS),
     });
   }
 }

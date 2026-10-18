@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/MergeDriverResult",
+  "definitions": {
+    "MergeDriverResult": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "xml",
+            "text"
+          ]
+        },
+        "conflicts": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "strategy",
+        "conflicts"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/MergeDriverUninstallResult",
+  "definitions": {
+    "MergeDriverUninstallResult": {
+      "type": "object",
+      "properties": {
+        "gitattributesPath": {
+          "type": "string"
+        },
+        "removedPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "gitattributesPath",
+        "removedPatterns"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

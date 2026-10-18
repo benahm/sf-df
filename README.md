@@ -137,6 +137,29 @@ fails.
 Translations need no such command: `sf project retrieve start -m "Translations:*"` and
 `-m "CustomObjectTranslation:Account-fr"` already return complete files, untranslated entries included.
 
+## Merge metadata by key: `sf df git merge-driver`
+
+git merges Profiles, Permission Sets, Custom Labels or Translations line by line: two branches that add a field
+permission or a label at the same place conflict, and a conflict often spans many unrelated elements.
+`sf df git merge-driver install` adds a git merge driver that merges these files element by element, using the key of
+each item (the `field` of a `fieldPermissions`, the `fullName` of a label).
+
+```bash
+# Once per clone: configures the driver and declares the files it handles in .gitattributes
+sf df git merge-driver install
+git add .gitattributes && git commit -m "Merge Salesforce metadata by key"
+```
+
+- Changes to different items never conflict, even when the items are next to each other.
+- Both sides changed the same item differently: conflict markers surround that item only.
+- One side deleted an item the other changed: conflict. Deleted and unchanged: deleted.
+- Added items keep the order of the file; two sorted files give a sorted file.
+- Files that can't be merged by key (not well-formed, duplicate keys) fall back to git's line merge.
+
+Handled: Profile, PermissionSet, CustomLabels, Translations, CustomObjectTranslation, Workflow, SharingRules,
+AssignmentRules, AutoResponseRules, EscalationRules, MatchingRules. `sf df git merge-driver uninstall` removes the driver.
+Details: [docs/merge-driver.md](docs/merge-driver.md).
+
 ## Migrating from `sfdx mdt:git:delta`
 
 | `sfdx mdt:git:delta` | `sf df git delta` |
@@ -193,6 +216,7 @@ Documentation:
 - [Architecture](docs/git-delta-architecture.md)
 - [Metadata strategies](docs/git-delta-metadata-strategies.md)
 - [Profile retrieve](docs/profile-retrieve.md)
+- [Merge driver](docs/merge-driver.md)
 - [Testing](docs/testing.md)
 
 ## Commands

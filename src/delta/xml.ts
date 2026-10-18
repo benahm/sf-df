@@ -32,6 +32,16 @@ const builder = new XMLBuilder({
 export const textOf = (value: unknown): string =>
   typeof value === 'string' ? value : value === undefined || value === null ? '' : JSON.stringify(value);
 
+// Rules for collections identified by one or more child elements; a key made of several elements joins them
+// with "::".
+export const keyedCollectionRules = (keys: Record<string, string[]>): XmlCollectionRules =>
+  Object.fromEntries(
+    Object.entries(keys).map(([fieldName, keyFields]) => [
+      fieldName,
+      { keySelector: (item: Record<string, unknown>) => keyFields.map((keyField) => textOf(item[keyField])).join('::') },
+    ])
+  );
+
 const ensureArray = <T>(value: T | T[] | undefined): T[] => {
   if (value === undefined) {
     return [];
@@ -85,22 +95,26 @@ export type XmlDiffResult = {
   hasDeletes: boolean;
 };
 
-type XmlChunk = { tag: string; raw: string };
-type XmlChunks = { prolog: string; rootOpen: string; rootClose: string; items: XmlChunk[] };
+// `lead` is the text between the previous element (or the root opening tag) and this one: indentation, and the
+// comments that sit between top-level elements.
+export type XmlChunk = { tag: string; raw: string; lead: string };
+// `tail` is the text between the last element and the root closing tag.
+export type XmlChunks = { prolog: string; rootOpen: string; rootClose: string; tail: string; items: XmlChunk[] };
 
 const TOKEN = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<(\/?)([A-Za-z_][\w:.-]*)[^>]*?(\/?)>/g;
 
 // Whitespace between tags is not significant (the parser trims values), so it is ignored when comparing.
-const normalizeChunk = (raw: string): string => raw.replace(/>\s+</g, '><').trim();
+export const normalizeChunk = (raw: string): string => raw.replace(/>\s+</g, '><').trim();
 
 // Splits a metadata file into its top-level elements without building a DOM. Returns undefined when the
 // document does not have the expected shape, so callers fall back to a full parse.
-const splitTopLevel = (xml: string): XmlChunks | undefined => {
+export const splitTopLevel = (xml: string): XmlChunks | undefined => {
   let depth = 0;
   let rootOpenEnd = -1;
   let rootStart = -1;
   let itemStart = -1;
   let itemTag = '';
+  let previousEnd = -1;
   const items: XmlChunks['items'] = [];
 
   for (const match of xml.matchAll(TOKEN)) {
@@ -113,25 +127,29 @@ const splitTopLevel = (xml: string): XmlChunks | undefined => {
     if (closing) {
       depth -= 1;
       if (depth === 1) {
-        items.push({ tag: itemTag, raw: xml.slice(itemStart, index + token.length) });
+        items.push({ tag: itemTag, raw: xml.slice(itemStart, index + token.length), lead: xml.slice(previousEnd, itemStart) });
+        previousEnd = index + token.length;
       } else if (depth === 0) {
         return {
           prolog: xml.slice(0, rootStart),
           rootOpen: xml.slice(rootStart, rootOpenEnd),
           rootClose: xml.slice(index),
+          tail: xml.slice(previousEnd, index),
           items,
         };
       }
     } else if (depth === 0) {
       rootStart = index;
       rootOpenEnd = index + token.length;
+      previousEnd = rootOpenEnd;
       depth = selfClosing ? 0 : 1;
     } else {
       if (depth === 1) {
         itemStart = index;
         itemTag = tag;
         if (selfClosing) {
-          items.push({ tag, raw: token });
+          items.push({ tag, raw: token, lead: xml.slice(previousEnd, index) });
+          previousEnd = index + token.length;
           continue;
         }
       }
@@ -139,6 +157,56 @@ const splitTopLevel = (xml: string): XmlChunks | undefined => {
       if (!selfClosing) {
         depth += 1;
       }
+    }
+  }
+
+  return undefined;
+};
+
+// Raw (still escaped) text of a direct child element, e.g. the <field> of a <fieldPermissions>. Nested
+// elements with the same name are skipped. Returns undefined when the child is missing.
+export const childElementText = (raw: string, childName: string): string | undefined => {
+  // Fast path: the first <childName> is a direct child when everything before it, inside the parent, is balanced.
+  const open = `<${childName}>`;
+  const start = raw.indexOf(open);
+  const parentOpenEnd = raw.indexOf('>') + 1;
+  if (start > 0) {
+    const before = raw.slice(parentOpenEnd, start);
+    const end = raw.indexOf(`</${childName}>`, start);
+    if (end > 0 && !before.includes('<!') && !before.includes('<?') && !raw.slice(start + open.length, end).includes('<')) {
+      const opened = before.split('<').length - 1;
+      const closed = before.split('</').length - 1;
+      const selfClosed = before.split('/>').length - 1;
+      if (opened - closed - selfClosed === closed) {
+        return raw.slice(start + open.length, end);
+      }
+    }
+  }
+
+  let depth = 0;
+  let valueStart = -1;
+
+  for (const match of raw.matchAll(TOKEN)) {
+    const [token, closing, tag, selfClosing] = match;
+    if (!tag) {
+      continue;
+    }
+
+    if (closing) {
+      depth -= 1;
+      if (depth === 1 && valueStart >= 0 && tag === childName) {
+        return raw.slice(valueStart, match.index);
+      }
+    } else if (selfClosing) {
+      if (depth === 1 && tag === childName) {
+        return '';
+      }
+    } else {
+      if (depth === 1 && tag === childName) {
+        valueStart = match.index + token.length;
+      }
+
+      depth += 1;
     }
   }
 
