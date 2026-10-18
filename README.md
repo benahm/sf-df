@@ -247,8 +247,96 @@ Documentation:
 ## Commands
 
 <!-- commands -->
+* [`sf df deploy`](#sf-df-deploy)
 * [`sf df git delta`](#sf-df-git-delta)
+* [`sf df git merge-driver install`](#sf-df-git-merge-driver-install)
+* [`sf df git merge-driver run`](#sf-df-git-merge-driver-run)
+* [`sf df git merge-driver uninstall`](#sf-df-git-merge-driver-uninstall)
 * [`sf df profile retrieve`](#sf-df-profile-retrieve)
+
+## `sf df deploy`
+
+Merge a branch into the branch of an org, deploy the result, and push the merge only if the deployment succeeds.
+
+```
+USAGE
+  $ sf df deploy -s <value> -o <value> [--json] [--flags-dir <value>] [--dry-run | --validate] [--from <value>]
+    [--allow-destructive] [-l NoTestRun|RunSpecifiedTests|RunLocalTests|RunAllTestsInOrg] [-w <value>]
+
+FLAGS
+  -l, --test-level=<option>  Deployment test level.
+                             <options: NoTestRun|RunSpecifiedTests|RunLocalTests|RunAllTestsInOrg>
+  -o, --target-org=<value>   (required) Username or alias of the target org. Not required if the `target-org`
+                             configuration variable is already set.
+  -s, --source=<value>       (required) Branch to deliver, merged into the branch of the org.
+  -w, --wait=<value>         [default: 60 minutes] Number of minutes to wait for the deployment. Past this delay, the
+                             job keeps running in the org.
+      --allow-destructive    Allow a deployment that deletes components from the org.
+      --dry-run              Show the merge, the delta and the tests without deploying or pushing anything.
+      --from=<value>         Commit the delta starts from, instead of the tip of the org's branch.
+      --validate             Validate the deployment (check only) without pushing the merge.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Merge a branch into the branch of an org, deploy the result, and push the merge only if the deployment succeeds.
+
+  Each org is linked to one branch in sfdx-project.json ("plugins.sfdf.orgs", the org being identified by its My Domain
+  URL). The tip of that branch is what is deployed in the org: only this command must push to it, which a branch
+  protection in the forge enforces.
+
+  The command fetches the org's branch and --source, merges them without checking anything out (git merge-tree, with the
+  XML merge driver of sf df git merge-driver), computes the delta between the branch tip and the merge, and deploys it
+  in a single atomic job: package, deletions and partial XML together. When the deployment succeeds, the merge is pushed
+  to the branch, fast-forward only. When it fails, nothing is pushed: the branch still matches the org and the command
+  can simply run again.
+
+  A deployment that deletes components requires --allow-destructive. Without --test-level, the tests are the classes
+  named after the deployed Apex classes (<Class>Test, <Class>_Test), or none.
+
+  Requires git 2.40 or later.
+
+EXAMPLES
+  Deliver a feature to the org "int" (its branch comes from sfdx-project.json):
+
+    $ sf df deploy --source feature/JIRA-123 --target-org int
+
+  See what would be deployed, without deploying:
+
+    $ sf df deploy --source feature/JIRA-123 --target-org int --dry-run
+
+  Validate a feature in a pull request pipeline:
+
+    $ sf df deploy --source feature/JIRA-123 --target-org int --validate
+
+  Redeploy after a sandbox refresh, the sandbox now holding production:
+
+    $ sf df deploy --source feature/JIRA-123 --target-org int --from main
+
+FLAG DESCRIPTIONS
+  -l, --test-level=NoTestRun|RunSpecifiedTests|RunLocalTests|RunAllTestsInOrg  Deployment test level.
+
+    Without this flag, RunSpecifiedTests with the test classes matching the deployed Apex classes, or NoTestRun when
+    none matches. RunSpecifiedTests alone fails when no test class matches.
+
+  -s, --source=<value>  Branch to deliver, merged into the branch of the org.
+
+    A branch of the remote (fetched first), or any commit of the repository.
+
+  --from=<value>  Commit the delta starts from, instead of the tip of the org's branch.
+
+    Needed when the org no longer matches its branch: after a sandbox refresh (--from main), or for the first deployment
+    of an org that doesn't match its branch yet.
+
+  --validate  Validate the deployment (check only) without pushing the merge.
+
+    Used to check a feature before it is delivered, in a pull request pipeline for example. The org and the branch are
+    left unchanged.
+```
+
+_See code: [src/commands/df/deploy.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/deploy.ts)_
 
 ## `sf df git delta`
 
@@ -327,7 +415,113 @@ FLAG DESCRIPTIONS
     be inside the deploy directory, or the other way round. Replaces --descructivedir of sfdx mdt:git:delta.
 ```
 
-_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.3-beta/src/commands/df/git/delta.ts)_
+_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/git/delta.ts)_
+
+## `sf df git merge-driver install`
+
+Merge Salesforce metadata XML by key instead of line by line.
+
+```
+USAGE
+  $ sf df git merge-driver install [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Merge Salesforce metadata XML by key instead of line by line.
+
+  Installs the "deltaforce" git merge driver in the current repository. Container metadata (Profile, PermissionSet,
+  CustomLabels, Translations, CustomObjectTranslation, Workflow, SharingRules, AssignmentRules, AutoResponseRules,
+  EscalationRules, MatchingRules) is then merged element by element, using the key of each item: the field of a
+  fieldPermissions, the fullName of a label. Two branches that change different items of the same file no longer
+  conflict, even when the items are next to each other. A conflict is only reported when both branches changed the same
+  item differently, and the markers surround that item alone.
+
+  The driver is declared in the local git config, which is not versioned: every clone runs this command once. The files
+  it handles are declared in .gitattributes with "merge=deltaforce": commit it so the whole team uses the driver.
+  Running the command again only adds what is missing.
+
+  Files that can't be merged by key (not well-formed, duplicate keys) are merged line by line, as git does by default.
+
+EXAMPLES
+  Install the merge driver in the current repository:
+
+    $ sf df git merge-driver install
+```
+
+_See code: [src/commands/df/git/merge-driver/install.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/git/merge-driver/install.ts)_
+
+## `sf df git merge-driver run`
+
+Merge three versions of a Salesforce metadata file by key (called by git).
+
+```
+USAGE
+  $ sf df git merge-driver run --ancestor <value> --current <value> --other <value> [--json] [--flags-dir <value>]
+    [--marker-size <value>] [--path <value>]
+
+FLAGS
+  --ancestor=<value>     (required) Common ancestor version of the file, given by git.
+  --current=<value>      (required) Current branch version of the file, given by git.
+  --marker-size=<value>  [default: 7] Length of the conflict markers, given by git.
+  --other=<value>        (required) Other branch version of the file, given by git.
+  --path=<value>         Path of the file in the repository, used in messages.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Merge three versions of a Salesforce metadata file by key (called by git).
+
+  git runs this command for the files declared with "merge=deltaforce" in .gitattributes, once `sf df git merge-driver
+  install` has configured the driver. It writes the merged file in place of --current and exits with code 1 when
+  conflicts are left, so git reports the file as conflicted.
+
+  Container metadata is merged element by element, using the key of each item; conflict markers surround only the items
+  both sides changed differently. Files that can't be merged by key are merged line by line with `git merge-file`.
+
+EXAMPLES
+  Merge three versions of a profile, as git does:
+
+    $ sf df git merge-driver run --ancestor base.xml --current ours.xml --other theirs.xml --path ^
+      force-app/main/default/profiles/Admin.profile-meta.xml
+
+FLAG DESCRIPTIONS
+  --current=<value>  Current branch version of the file, given by git.
+
+    Receives the merged result.
+```
+
+_See code: [src/commands/df/git/merge-driver/run.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/git/merge-driver/run.ts)_
+
+## `sf df git merge-driver uninstall`
+
+Remove the Salesforce metadata merge driver.
+
+```
+USAGE
+  $ sf df git merge-driver uninstall [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Remove the Salesforce metadata merge driver.
+
+  Removes the "deltaforce" merge driver from the local git config, and the "merge=deltaforce" lines from .gitattributes.
+  Other lines of .gitattributes are kept; the file is deleted when nothing else is left in it.
+
+EXAMPLES
+  Remove the merge driver from the current repository:
+
+    $ sf df git merge-driver uninstall
+```
+
+_See code: [src/commands/df/git/merge-driver/uninstall.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/git/merge-driver/uninstall.ts)_
 
 ## `sf df profile retrieve`
 
@@ -385,5 +579,5 @@ FLAG DESCRIPTIONS
     When omitted, the profiles found in --source-dir are overwritten. Replaces --outputdir of sfdx mdt:profile:retrieve.
 ```
 
-_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.3-beta/src/commands/df/profile/retrieve.ts)_
+_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/profile/retrieve.ts)_
 <!-- commandsstop -->
