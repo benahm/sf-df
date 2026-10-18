@@ -160,6 +160,30 @@ Handled: Profile, PermissionSet, CustomLabels, Translations, CustomObjectTransla
 AssignmentRules, AutoResponseRules, EscalationRules, MatchingRules. `sf df git merge-driver uninstall` removes the driver.
 Details: [docs/merge-driver.md](docs/merge-driver.md).
 
+## Deliver a branch to an org: `sf df deploy`
+
+Each org is linked to one branch, whose tip is what the org holds. `sf df deploy` merges a feature into that branch
+without checkout, deploys the delta in one atomic job, and pushes the merge only if the deployment succeeded.
+
+```json
+"plugins": {
+  "sfdf": {
+    "orgs": [{ "url": "https://example--int.sandbox.my.salesforce.com", "branch": "int" }]
+  }
+}
+```
+
+```bash
+sf df deploy --source feature/JIRA-123 --target-org int
+```
+
+- A failed deployment pushes nothing: the branch still matches the org.
+- Only the command must push to the branch: protect it in the forge.
+- `--dry-run` shows the merge, the delta and the tests; `--validate` checks without pushing.
+- Deletions require `--allow-destructive`. After a sandbox refresh: `--from main`.
+
+Details: [docs/deploy.md](docs/deploy.md).
+
 ## Migrating from `sfdx mdt:git:delta`
 
 | `sfdx mdt:git:delta` | `sf df git delta` |
@@ -217,6 +241,7 @@ Documentation:
 - [Metadata strategies](docs/git-delta-metadata-strategies.md)
 - [Profile retrieve](docs/profile-retrieve.md)
 - [Merge driver](docs/merge-driver.md)
+- [Deploy](docs/deploy.md)
 - [Testing](docs/testing.md)
 
 ## Commands

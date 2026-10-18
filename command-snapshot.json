@@ -1,6 +1,30 @@
 [
     {
         "alias": [],
+        "command": "df:deploy",
+        "flagAliases": [],
+        "flagChars": [
+            "l",
+            "o",
+            "s",
+            "w"
+        ],
+        "flags": [
+            "allow-destructive",
+            "dry-run",
+            "flags-dir",
+            "from",
+            "json",
+            "source",
+            "target-org",
+            "test-level",
+            "validate",
+            "wait"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
         "command": "df:git:delta",
         "flagAliases": [
             "descructivedir",

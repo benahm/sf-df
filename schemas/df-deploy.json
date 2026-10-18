@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/DeployBranchResult",
+  "definitions": {
+    "DeployBranchResult": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/DeployStatus"
+        },
+        "orgUrl": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "alreadyMerged": {
+          "type": "boolean"
+        },
+        "pushed": {
+          "type": "boolean"
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deletions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "testLevel": {
+          "$ref": "#/definitions/TestLevel"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deployId": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "status",
+        "orgUrl",
+        "branch",
+        "source",
+        "base",
+        "from",
+        "commit",
+        "alreadyMerged",
+        "pushed",
+        "components",
+        "deletions",
+        "testLevel",
+        "tests",
+        "warnings"
+      ],
+      "additionalProperties": false
+    },
+    "DeployStatus": {
+      "type": "string",
+      "enum": [
+        "dryRun",
+        "validated",
+        "deployed",
+        "nothingToDeploy"
+      ]
+    },
+    "TestLevel": {
+      "type": "string",
+      "enum": [
+        "NoTestRun",
+        "RunSpecifiedTests",
+        "RunLocalTests",
+        "RunAllTestsInOrg"
+      ]
+    }
+  }
+}
