@@ -165,15 +165,12 @@ Details: [docs/merge-driver.md](docs/merge-driver.md).
 Each org is linked to one branch, whose tip is what the org holds. `sf df deploy` merges a feature into that branch
 without checkout, deploys the delta in one atomic job, and pushes the merge only if the deployment succeeded.
 
-```json
-"plugins": {
-  "sfdf": {
-    "orgs": [{ "url": "https://example--int.sandbox.my.salesforce.com", "branch": "int" }]
-  }
-}
-```
-
 ```bash
+# Once per org: stores the org's URL and its branch in sfdx-project.json (commit it)
+sf df org map --target-org int --branch int
+# Show the mapping
+sf df org map
+
 sf df deploy --source feature/JIRA-123 --target-org int
 ```
 

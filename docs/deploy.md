@@ -1,6 +1,7 @@
 # `sf df deploy`
 
-Commande : [`src/commands/df/deploy.ts`](../src/commands/df/deploy.ts). Moteur : [`src/deploy/`](../src/deploy/).
+Commandes : [`src/commands/df/deploy.ts`](../src/commands/df/deploy.ts),
+[`src/commands/df/org/map.ts`](../src/commands/df/org/map.ts). Moteur : [`src/deploy/`](../src/deploy/).
 
 Merge une branche dans la branche d'une org, déploie le résultat sur l'org, et ne pousse le merge que si le
 déploiement a réussi.
@@ -20,7 +21,18 @@ le merge arrive sur la branche.
 
 ## Configuration
 
-Dans `sfdx-project.json`, sous la clé `plugins` que Salesforce réserve aux plugins :
+`sf df org map` écrit et affiche le mapping, en lisant l'URL de l'org depuis la connexion :
+
+```bash
+sf df org map --target-org int --branch int   # lie l'org à sa branche
+sf df org map                                 # affiche le mapping, avec l'alias local de chaque org
+sf df org map --target-org int --remove       # retire l'org
+```
+
+Une branche n'a qu'une org : mapper une branche déjà prise est refusé. Seul `plugins.sfdf.orgs` est modifié, le reste
+du fichier garde son contenu et son indentation. Commiter `sfdx-project.json` pour partager le mapping.
+
+Le résultat, dans `sfdx-project.json`, sous la clé `plugins` que Salesforce réserve aux plugins :
 
 ```json
 "plugins": {
@@ -119,6 +131,8 @@ Le token du CI doit pouvoir pousser sur la branche de l'org.
   après succès, rien poussé après échec, conflit, merge-driver lu dans `.gitattributes` de la branche, suppressions,
   dry run, validate, push refusé, `--from`, merge sans metadata, org inconnue.
 - `test/deploy/config-tests.test.ts` : configuration et sélection des tests.
+- `test/deploy/org-map.test.ts`, `test/commands/df/org/map.test.ts` : `sf df org map` (ajout, changement de branche,
+  branche déjà prise, suppression, fichier préservé, alias locaux).
 
 Pas encore prouvé en org : le déploiement via SDR (`metadataApiDeployer`). Le test e2e `metadata-lifecycle` prouve
 déjà un job unique package + suppressions, mais via `sf project deploy start`.

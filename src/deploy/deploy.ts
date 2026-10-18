@@ -104,7 +104,7 @@ const branchOf = (config: DeployConfig, orgUrl: string): string => {
     throw new SfError(
       `The org ${orgUrl} is not declared in sfdx-project.json ("plugins.sfdf.orgs"): its branch is unknown.`,
       NAME,
-      ['Add { "url": "<org My Domain URL>", "branch": "<branch>" } to "plugins.sfdf.orgs".']
+      ['Map it: sf df org map --target-org <org> --branch <branch>, then commit sfdx-project.json.']
     );
   }
 

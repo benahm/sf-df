@@ -87,6 +87,23 @@
     },
     {
         "alias": [],
+        "command": "df:org:map",
+        "flagAliases": [],
+        "flagChars": [
+            "b",
+            "o"
+        ],
+        "flags": [
+            "branch",
+            "flags-dir",
+            "json",
+            "remove",
+            "target-org"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
         "command": "df:profile:retrieve",
         "flagAliases": [
             "outputdir",

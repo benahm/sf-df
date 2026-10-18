@@ -39,7 +39,10 @@ export const parseDeployConfig = (project: unknown, projectFile = 'sfdx-project.
   const plugins = isRecord(project) ? project.plugins : undefined;
   const settings = isRecord(plugins) ? plugins[CONFIG_KEY] : undefined;
   if (!isRecord(settings)) {
-    throw configError(projectFile, 'missing. Declare the branch of each org in "orgs".');
+    throw configError(
+      projectFile,
+      'missing. Map each org to its branch with: sf df org map --target-org <org> --branch <branch>'
+    );
   }
 
   if (!Array.isArray(settings.orgs) || settings.orgs.length === 0) {

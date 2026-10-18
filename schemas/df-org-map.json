@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/OrgMapResult",
+  "definitions": {
+    "OrgMapResult": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "mapped",
+            "unchanged",
+            "removed"
+          ]
+        },
+        "projectFile": {
+          "type": "string"
+        },
+        "orgs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OrgMapping"
+          }
+        },
+        "previousBranch": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "projectFile",
+        "orgs"
+      ],
+      "additionalProperties": false
+    },
+    "OrgMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "localAliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "url": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "localAliases",
+        "url"
+      ]
+    }
+  }
+}
