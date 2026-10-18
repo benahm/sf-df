@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/static/img/logo-dark.svg">
+    <img src="website/static/img/logo.svg" alt="Deltaforce" width="120">
+  </picture>
+</p>
+
 # Deltaforce (`sf df`)
 
 > **Beta.** Deltaforce is still in beta: review the generated delta before deploying it to production, and please
