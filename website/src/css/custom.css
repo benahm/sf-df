@@ -1,0 +1,23 @@
+/* Salesforce-like blue, lighter in dark mode for contrast. */
+:root {
+  --ifm-color-primary: #0b5cab;
+  --ifm-color-primary-dark: #0a539a;
+  --ifm-color-primary-darker: #094e91;
+  --ifm-color-primary-darkest: #084078;
+  --ifm-color-primary-light: #0c65bc;
+  --ifm-color-primary-lighter: #0d6ac5;
+  --ifm-color-primary-lightest: #0f78de;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #5aa7f0;
+  --ifm-color-primary-dark: #3d97ee;
+  --ifm-color-primary-darker: #2e8fec;
+  --ifm-color-primary-darkest: #1376d6;
+  --ifm-color-primary-light: #77b7f2;
+  --ifm-color-primary-lighter: #86bff4;
+  --ifm-color-primary-lightest: #b1d5f8;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}

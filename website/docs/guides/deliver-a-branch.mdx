@@ -1,0 +1,71 @@
+---
+title: Deliver a branch
+---
+
+`sf df deploy` takes a feature to an org in one command, and keeps the branch of the org identical to what the org
+holds.
+
+```bash
+sf df deploy --source feature/JIRA-123 --target-org int
+```
+
+## One branch, one org
+
+Each org is mapped to one branch with [`sf df org map`](../commands/df-org-map.md). The tip of that branch **is** the
+state of the org: there is no tag, no record in the org, no state file. This holds as long as only `sf df deploy`
+pushes to the branch, which a branch protection in the forge enforces.
+
+## What the command does
+
+1. **Fetch** the branch of the org and `--source` from the remote. Nothing is checked out: your working copy is left
+   alone.
+2. **Merge without checkout.** `git merge-tree` merges the feature into the branch and `git commit-tree` turns the
+   result into a merge commit that no branch points to yet. Profiles, permission sets, labels and translations are
+   merged item by item with the [merge driver](./merge-driver.md). A remaining conflict stops everything.
+3. **Compute the delta** between the branch (what the org holds) and the merge, with the engine of
+   [`sf df git delta`](./delta.md).
+4. **Deploy in one job**: package and deletions together, rolled back entirely if one component is rejected.
+5. **Push only on success.** The merge commit is pushed to the branch, fast-forward only. If the deployment failed,
+   nothing is pushed: the branch still matches the org, fix the feature and run the command again.
+
+A merge that touches no metadata (README, CI files) is pushed without deploying anything.
+
+## Before delivering
+
+| Need | Flag |
+| --- | --- |
+| See the merge, the delta and the tests, without deploying or pushing | `--dry-run` |
+| Check the deployment in the org without changing it, in a pull request pipeline | `--validate` |
+| Choose the tests | `--test-level` |
+
+Without `--test-level`, the tests are the classes named after the deployed Apex classes (`InvoiceTest` and
+`Invoice_Test` for `Invoice`) plus the deployed test classes themselves. When none matches, no test runs, which
+sandboxes accept.
+
+## Deletions
+
+A delta that deletes components from the org requires `--allow-destructive`. The command lists the deletions and stops
+without deploying otherwise. `--validate` and `--dry-run` show them without requiring the flag.
+
+## When the branch and the org drift apart
+
+| Situation | What to do |
+| --- | --- |
+| Deployed, but the push was refused because the branch moved | Run the command again: the feature is redeployed (already in the org, harmless) and pushed. |
+| The sandbox was refreshed from production | Run once with `--from main`: the delta holds what the branch has on top of production. |
+| First delivery to an org that doesn't match its branch yet | Run once with `--from <commit that describes the org>`. |
+| Someone pushed to the branch by hand | The branch is ahead of the org and the command can't tell. Protect the branch. |
+| Someone changed the org by hand | The command can't see it: the next deployment of that component overwrites it. |
+
+:::warning[Hotfixes after a refresh]
+
+After a refresh, a hotfix that is in production but was never merged back into the branch is **deleted** from the
+sandbox by the next delivery, since the branch doesn't have it. The command asks for `--allow-destructive` and lists it:
+merge `main` back into the branch instead.
+
+:::
+
+## Concurrency
+
+Run one delivery at a time per org: a concurrency group in the CI does it (see [CI setup](./ci.md)). If two runs overlap
+anyway, the second push is refused and the command tells you to run it again.

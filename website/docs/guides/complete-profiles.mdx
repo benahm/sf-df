@@ -1,0 +1,35 @@
+---
+title: Retrieve complete profiles
+---
+
+`sf project retrieve start -m Profile:Admin` only returns the accesses to the components retrieved in the same
+request: on its own, a profile comes back without its field, object, class, layout or tab accesses.
+[`sf df profile retrieve`](../commands/df-profile-retrieve.md) reads each profile with the Metadata API `readMetadata`
+call, which returns all of them, and writes it in the layout of `sf project retrieve start`, so that git only shows
+real changes.
+
+```bash
+# Overwrite every profile of the project with the complete profile of the org
+sf df profile retrieve --source-dir force-app/main/default/profiles --target-org my-sandbox
+
+# One profile, written into another folder
+sf df profile retrieve --source-dir "force-app/main/default/profiles/Admin.profile-meta.xml" --output-dir retrieved
+```
+
+- One call per profile, 5 in parallel; each profile is written as soon as it arrives.
+- A profile missing from the org is reported and its file is left **untouched**; the command then exits with 1.
+- Network errors and transient org errors are retried 3 times.
+- API version: `--api-version`, then `sourceApiVersion` of `sfdx-project.json`. The content of a profile depends on it.
+
+On a 600-profile sandbox, 50 complete profiles (97 MB) take about 2 minutes.
+
+:::warning
+
+The retrieved profile grants access to **every** component of the org, including fields and classes that are not in
+the project (managed packages, changes made directly in the org). Deploying it to an org where one of them is missing
+fails.
+
+:::
+
+Translations need no such command: `sf project retrieve start -m "Translations:*"` and
+`-m "CustomObjectTranslation:Account-fr"` already return complete files, untranslated entries included.

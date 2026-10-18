@@ -3,6 +3,8 @@
 > **Beta.** Deltaforce is still in beta: review the generated delta before deploying it to production, and please
 > [report issues](https://github.com/benahm/sf-df/issues).
 
+**Documentation: [benahm.github.io/sf-df](https://benahm.github.io/sf-df/)**
+
 A [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) plugin that builds an **incremental deployment
 from a git diff**: only the metadata that changed is packaged, and deletions produce a `destructiveChanges.xml`.
 

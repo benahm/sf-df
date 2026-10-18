@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="16 15 112 112" role="img" aria-label="Deltaforce">
+  <!-- A cloud (Salesforce) with a delta cut out of it: the triangle shows the background. -->
+  <mask id="delta">
+    <rect x="0" y="0" width="140" height="140" fill="#fff"/>
+    <path d="M72 56 L55 92 H89 Z" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
+  </mask>
+  <g fill="#0b5cab" mask="url(#delta)">
+    <circle cx="44" cy="84" r="24"/>
+    <circle cx="72" cy="66" r="32"/>
+    <circle cx="100" cy="84" r="24"/>
+    <rect x="44" y="84" width="56" height="24"/>
+  </g>
+</svg>
