@@ -23,7 +23,15 @@ Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
 
 ### `snapshot.ts`
 
-- Crée un snapshot git temporaire avec `git archive` pour `--from` et éventuellement `--to`.
+- Crée un snapshot git temporaire pour `--from` et éventuellement `--to`, les deux en parallèle.
+- N'extrait que les composants des fichiers changés (`componentScope`) : le dossier entier d'un objet, d'un bundle
+  ou d'un dossier de reports, ou un fichier avec son `-meta.xml` (`classes/Foo.cls` et `Foo.cls-meta.xml`, pas
+  `FooBar.cls`). Les deux côtés reçoivent les mêmes composants : un renommage ou la suppression d'un fichier de bundle
+  cherche le même composant de l'autre côté.
+- L'extraction passe par `git ls-tree` sur les seuls dossiers de type touchés, un index temporaire
+  (`update-index --index-info`) et un seul `checkout-index`. Extraire tout `sourceDir` prenait plus d'une minute par
+  snapshot sur Windows pour un gros projet.
+- Si un fichier changé n'est dans aucun dossier de type du registre SDR, tout `sourceDir` est extrait, comme avant.
 - Réutilise directement le workspace si `--to` n'est pas fourni.
 - Nettoie les répertoires temporaires en fin de traitement.
 
@@ -67,6 +75,11 @@ Chaque opération produit un `DeltaArtifacts` contenant au besoin :
 - des warnings.
 
 Le moteur déduplique les artefacts via `dedupeKey` pour éviter les doublons lorsqu'un même composant est touché plusieurs fois.
+
+La résolution et le `build` des stratégies ne font que lire les snapshots : ils tournent par lots de 16 opérations en
+parallèle. Les artefacts d'un lot sont ensuite fusionnés dans l'ordre du diff git, ce qui garde l'écriture des fichiers et
+la déduplication déterministes. Chaque chemin n'est résolu qu'une fois par SDR (`resolvePath`), pour le composant et pour
+son entrée de manifest.
 
 ## Contrat d'extension
 

@@ -134,24 +134,11 @@ const buildFallbackResolution = (
   };
 };
 
-export const resolveMetadataFromPath = async (
+const toResolvedComponent = (
   snapshot: SnapshotRef,
-  relativePath: string
-): Promise<ResolvedMetadataComponent | undefined> => {
-  const absolutePath = path.join(snapshot.rootDir, relativePath);
-  const exists = await pathExists(absolutePath);
-
-  if (!exists) {
-    return buildFallbackResolution(snapshot, relativePath.replace(`${snapshot.sourceDir}/`, ''));
-  }
-
-  // A file SDR does not recognise is not metadata (or is forceignored): guessing a type from its folder
-  // would turn lwc/jsconfig.json into a bogus LightningComponentBundle.
-  const component = chooseComponent(resolveComponents(absolutePath), absolutePath);
-  if (!component) {
-    return undefined;
-  }
-
+  relativePath: string,
+  component: SourceComponent
+): ResolvedMetadataComponent => {
   const contentRelativePaths = unique(
     [...component.walkContent(), component.xml, component.content]
       .filter((entry): entry is string => Boolean(entry))
@@ -174,24 +161,28 @@ export const resolveMetadataFromPath = async (
   };
 };
 
-export const resolveManifestEntry = async (
+// Resolves a path with SDR once, for both the component and its package.xml entry: SDR resolution is the costly
+// part of a delta (it walks up the folders of every file).
+export const resolvePath = async (
   snapshot: SnapshotRef,
   relativePath: string
-): Promise<ManifestEntry | undefined> => {
+): Promise<{ resolvedMetadata?: ResolvedMetadataComponent; manifestEntry?: ManifestEntry }> => {
   const absolutePath = path.join(snapshot.rootDir, relativePath);
 
-  if (await pathExists(absolutePath)) {
-    const component = chooseComponent(resolveComponents(absolutePath), absolutePath);
-    return component ? getManifestEntry(component) : undefined;
+  if (!(await pathExists(absolutePath))) {
+    const fallback = buildFallbackResolution(snapshot, relativePath.replace(`${snapshot.sourceDir}/`, ''));
+    return {
+      resolvedMetadata: fallback,
+      manifestEntry: fallback ? { type: fallback.typeName, fullName: fallback.fullName } : undefined,
+    };
   }
 
-  const fallback = buildFallbackResolution(snapshot, relativePath.replace(`${snapshot.sourceDir}/`, ''));
-  if (!fallback) {
-    return undefined;
+  // A file SDR does not recognise is not metadata (or is forceignored): guessing a type from its folder
+  // would turn lwc/jsconfig.json into a bogus LightningComponentBundle.
+  const component = chooseComponent(resolveComponents(absolutePath), absolutePath);
+  if (!component) {
+    return {};
   }
 
-  return {
-    type: fallback.typeName,
-    fullName: fallback.fullName,
-  };
+  return { resolvedMetadata: toResolvedComponent(snapshot, relativePath, component), manifestEntry: getManifestEntry(component) };
 };

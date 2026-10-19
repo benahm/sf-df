@@ -7,7 +7,7 @@ import { dropComponentsOfDeletedObjects } from './destructive-rules.js';
 import { copyFileInto, ensureDir, pathExists } from './fs.js';
 import { getGitChanges } from './git.js';
 import { buildManifestXml, readSourceApiVersion } from './manifest.js';
-import { resolveManifestEntry, resolveMetadataFromPath } from './metadata-resolver.js';
+import { resolvePath } from './metadata-resolver.js';
 import { SnapshotManager } from './snapshot.js';
 import { StrategyRegistry } from './strategies/strategy-registry.js';
 import type {
@@ -21,7 +21,11 @@ import type {
   SnapshotRef,
 } from './types.js';
 
-const emptyCountsByStatus = (): Record<GitChangeStatus, number> => ({
+// Operations resolved and built at the same time: enough to hide file system latency, few enough to keep the
+// built XML of big Profiles or Translations in memory only a batch at a time.
+const BUILD_BATCH_SIZE = 16;
+
+const emptyCountsByStatus =(): Record<GitChangeStatus, number> => ({
   add: 0,
   modify: 0,
   delete: 0,
@@ -126,10 +130,7 @@ const parseManifestSet = (entries: Set<string>): Array<{ type: string; fullName:
   });
 
 const resolveOperation = async (operation: ProcessOperation): Promise<ResolvedOperation> => {
-  const [resolvedMetadata, manifestEntry] = await Promise.all([
-    resolveMetadataFromPath(operation.sourceSnapshot, operation.relativePath),
-    resolveManifestEntry(operation.sourceSnapshot, operation.relativePath),
-  ]);
+  const { resolvedMetadata, manifestEntry } = await resolvePath(operation.sourceSnapshot, operation.relativePath);
 
   return {
     operation,
@@ -235,32 +236,43 @@ export const generateDelta = async (options: {
   await ensureDir(packageDir);
   await ensureDir(destructiveDir);
 
-  const oldSnapshot = await snapshotManager.createFrom(options.from);
-  const newSnapshot = options.to ? await snapshotManager.createFrom(options.to) : snapshotManager.createWorkspace();
+  const sourceChanges = (await getGitChanges(options.repoRoot, options.from, options.to)).filter(
+    (change) => change.path.startsWith(`${sourceDir}/`) || (change.previousPath?.startsWith(`${sourceDir}/`) ?? false)
+  );
+  // Both sides only need the components of the changed files: a rename or a partial bundle delete looks up the
+  // same component on the other side.
+  const changedPaths = sourceChanges.flatMap((change) => (change.previousPath ? [change.previousPath, change.path] : [change.path]));
+  const [oldSnapshot, newSnapshot] = await Promise.all([
+    snapshotManager.createFrom(options.from, changedPaths),
+    options.to ? snapshotManager.createFrom(options.to, changedPaths) : snapshotManager.createWorkspace(),
+  ]);
   const isIgnoredInOld = forceIgnoreOf(oldSnapshot);
   const isIgnoredInNew = forceIgnoreOf(newSnapshot);
 
-  const gitChanges = (await getGitChanges(options.repoRoot, options.from, options.to))
-    .filter(
-      (change) => change.path.startsWith(`${sourceDir}/`) || (change.previousPath?.startsWith(`${sourceDir}/`) ?? false)
-    )
-    .filter((change) =>
-      change.status === 'delete' ? !isIgnoredInOld(change.path) : !isIgnoredInNew(change.path)
-    );
+  const gitChanges = sourceChanges.filter((change) =>
+    change.status === 'delete' ? !isIgnoredInOld(change.path) : !isIgnoredInNew(change.path)
+  );
 
   try {
-    for (const change of gitChanges) {
+    const operations = gitChanges.flatMap((change) => {
       summary.countsByStatus[change.status] += 1;
-      const operations = normalizeOperations(change, oldSnapshot, newSnapshot);
+      return normalizeOperations(change, oldSnapshot, newSnapshot);
+    });
 
-      for (const operation of operations) {
-        // Resolve metadata once so strategy selection and generic fallback share the same context.
-        // eslint-disable-next-line no-await-in-loop
-        const resolvedOperation = await redirectPartialBundleDelete(await resolveOperation(operation));
-        const strategy = registry.getStrategy(resolvedOperation);
-        // Strategy execution stays sequential so file writes and dedupe decisions remain deterministic.
-        // eslint-disable-next-line no-await-in-loop
-        const artifacts = await strategy.build(resolvedOperation);
+    for (let start = 0; start < operations.length; start += BUILD_BATCH_SIZE) {
+      // Resolving and building only read the snapshots, so a batch runs in parallel; its results are then merged
+      // in git order, which keeps file writes and dedupe decisions deterministic.
+      // eslint-disable-next-line no-await-in-loop
+      const built = await Promise.all(
+        operations.slice(start, start + BUILD_BATCH_SIZE).map(async (operation) => {
+          // Resolve metadata once so strategy selection and generic fallback share the same context.
+          const resolvedOperation = await redirectPartialBundleDelete(await resolveOperation(operation));
+          const strategy = registry.getStrategy(resolvedOperation);
+          return { strategy, artifacts: await strategy.build(resolvedOperation) };
+        })
+      );
+
+      for (const { strategy, artifacts } of built) {
         if (!artifacts || dedupeKeys.has(artifacts.dedupeKey)) {
           continue;
         }
