@@ -258,6 +258,7 @@ Documentation:
 * [`sf df git merge-driver install`](#sf-df-git-merge-driver-install)
 * [`sf df git merge-driver run`](#sf-df-git-merge-driver-run)
 * [`sf df git merge-driver uninstall`](#sf-df-git-merge-driver-uninstall)
+* [`sf df org map`](#sf-df-org-map)
 * [`sf df profile retrieve`](#sf-df-profile-retrieve)
 
 ## `sf df deploy`
@@ -342,7 +343,7 @@ FLAG DESCRIPTIONS
     left unchanged.
 ```
 
-_See code: [src/commands/df/deploy.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/deploy.ts)_
+_See code: [src/commands/df/deploy.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/deploy.ts)_
 
 ## `sf df git delta`
 
@@ -421,7 +422,7 @@ FLAG DESCRIPTIONS
     be inside the deploy directory, or the other way round. Replaces --descructivedir of sfdx mdt:git:delta.
 ```
 
-_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/git/delta.ts)_
+_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/delta.ts)_
 
 ## `sf df git merge-driver install`
 
@@ -457,7 +458,7 @@ EXAMPLES
     $ sf df git merge-driver install
 ```
 
-_See code: [src/commands/df/git/merge-driver/install.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/git/merge-driver/install.ts)_
+_See code: [src/commands/df/git/merge-driver/install.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/merge-driver/install.ts)_
 
 ## `sf df git merge-driver run`
 
@@ -501,7 +502,7 @@ FLAG DESCRIPTIONS
     Receives the merged result.
 ```
 
-_See code: [src/commands/df/git/merge-driver/run.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/git/merge-driver/run.ts)_
+_See code: [src/commands/df/git/merge-driver/run.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/merge-driver/run.ts)_
 
 ## `sf df git merge-driver uninstall`
 
@@ -527,7 +528,59 @@ EXAMPLES
     $ sf df git merge-driver uninstall
 ```
 
-_See code: [src/commands/df/git/merge-driver/uninstall.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/git/merge-driver/uninstall.ts)_
+_See code: [src/commands/df/git/merge-driver/uninstall.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/merge-driver/uninstall.ts)_
+
+## `sf df org map`
+
+Map an org to its branch for sf df deploy, or show the mapping.
+
+```
+USAGE
+  $ sf df org map [--json] [--flags-dir <value>] [-o <value>] [--remove | -b <value>]
+
+FLAGS
+  -b, --branch=<value>      Branch that holds the content of the org.
+  -o, --target-org=<value>  Org to map or remove. Its URL is what is stored.
+      --remove              Remove the org from the mapping.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Map an org to its branch for sf df deploy, or show the mapping.
+
+  sf df deploy delivers to an org through its branch: the branch tip is what the org holds. The mapping is stored in
+  sfdx-project.json ("plugins.sfdf.orgs"), shared by the team, with the org identified by its My Domain URL: aliases
+  differ between machines, the URL doesn't, even after a sandbox refresh.
+
+  With --branch, maps the org of --target-org to the branch: its URL is read from the org, never typed. A branch belongs
+  to one org only. With --remove, removes the org from the mapping. Without either, shows the mapping, with the local
+  alias of each org when it is authenticated on this machine.
+
+  Only "plugins.sfdf.orgs" is changed: the rest of sfdx-project.json keeps its content and indentation. Commit it so the
+  team and the CI share the mapping.
+
+EXAMPLES
+  Map the org "int" to the branch int:
+
+    $ sf df org map --target-org int --branch int
+
+  Show the mapping:
+
+    $ sf df org map
+
+  Remove an org from the mapping:
+
+    $ sf df org map --target-org int --remove
+
+FLAG DESCRIPTIONS
+  -b, --branch=<value>  Branch that holds the content of the org.
+
+    Adds the org to the mapping, or changes its branch. Fails when the branch is already mapped to another org.
+```
+
+_See code: [src/commands/df/org/map.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/org/map.ts)_
 
 ## `sf df profile retrieve`
 
@@ -585,5 +638,5 @@ FLAG DESCRIPTIONS
     When omitted, the profiles found in --source-dir are overwritten. Replaces --outputdir of sfdx mdt:profile:retrieve.
 ```
 
-_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.4-beta/src/commands/df/profile/retrieve.ts)_
+_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/profile/retrieve.ts)_
 <!-- commandsstop -->
