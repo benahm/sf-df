@@ -1,14 +1,14 @@
+# Deltaforce (`sf df`)
+
+> **Beta.** Deltaforce is still in beta: review the generated delta before deploying it to production, and please
+> [report issues](https://github.com/benahm/sf-df/issues).
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="website/static/img/logo-dark.svg">
     <img src="website/static/img/logo.svg" alt="Deltaforce" width="120">
   </picture>
 </p>
-
-# Deltaforce (`sf df`)
-
-> **Beta.** Deltaforce is still in beta: review the generated delta before deploying it to production, and please
-> [report issues](https://github.com/benahm/sf-df/issues).
 
 **Documentation: [benahm.github.io/sf-df](https://benahm.github.io/sf-df/)**
 
@@ -248,6 +248,7 @@ Documentation:
 - [Profile retrieve](docs/profile-retrieve.md)
 - [Merge driver](docs/merge-driver.md)
 - [Deploy](docs/deploy.md)
+- [Roadmap](docs/roadmap.md)
 - [Testing](docs/testing.md)
 
 ## Commands
