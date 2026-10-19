@@ -90,6 +90,10 @@ Chacune est couverte par `test/delta/sandbox-findings.test.ts`.
 | Un fichier d'un bundle supprimé (LWC, Aura, static resource, site Aura, vue LWR) | le composant existe toujours | redéploiement du bundle, pas de destructive |
 | Une page d'un site LWR supprimée | `DigitalExperience` adressable | destructive de la vue / route seulement |
 | Accès retiré d'un `PermissionSet` | le déploiement **remplace** le permission set | fichier complet (jamais de XML partiel) |
+| Valeur retirée d'une picklist d'un `RecordType` | le déploiement remplace la liste de cette picklist | toutes les `picklistValues` du record type |
+| Picklist entière retirée d'un `RecordType` | même le fichier complet la laisse dans l'org | rien |
+| `RecordType` par défaut d'un profil supprimé | la désactivation passe | XML avec `active=false` |
+| Élément retiré d'un `Profile` | le déploiement ne retire jamais ce que le XML ne cite pas | rien (lacune : passer l'accès à `false` pour le révoquer) |
 | `GlobalValueSet` utilisée par un champ supprimé | le champ reste 15 jours dans la corbeille et bloque | rien à faire côté delta : suppression après purge |
 
 ## Fichiers qui ne sont pas des metadata

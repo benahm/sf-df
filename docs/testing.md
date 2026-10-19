@@ -20,6 +20,27 @@ node --loader ts-node/esm --no-warnings=ExperimentalWarning ./bin/dev.js snapsho
 node --loader ts-node/esm --no-warnings=ExperimentalWarning ./bin/dev.js schema:generate
 ```
 
+## Delta tests by metadata type
+
+`test/delta/types/` holds one file per metadata type (or family) and covers, for each, the same matrix: addition,
+change of a simple field, change of one item of a collection, pure reformatting, deletion, rename, deletion of the
+parent, changes spanning several commits.
+
+| File | Types |
+| --- | --- |
+| `record-type.test.ts` | RecordType: singletons, picklist values, deactivation, rename |
+| `profile.test.ts` | Profile: one test per keyed collection, removed items, rename |
+| `permission-set.test.ts` | PermissionSet, PermissionSetGroup, MutingPermissionSet |
+| `custom-object.test.ts` | CustomObject, CustomField, ListView, ValidationRule |
+| `translations.test.ts` | Translations, CustomObjectTranslation |
+| `flow.test.ts` | Flow |
+| `container-rules.test.ts` | CustomLabels, Workflow, SharingRules |
+| `cross-cutting.test.ts` | untracked files, commit ranges |
+
+Tests share `test/delta/helpers/delta-repo.ts` (a temporary git repository and a readable view of the delta) and
+`test/delta/helpers/metadata-xml.ts` (builders for metadata source files). A test whose expected result depends on how
+Salesforce reacts says in a comment whether it was verified in a sandbox; a known gap says so in its name or comment.
+
 ## NUTs
 
 `npm run test:nuts` runs `test/**/*.nut.ts` with `@salesforce/cli-plugins-testkit`: the real command is executed through
