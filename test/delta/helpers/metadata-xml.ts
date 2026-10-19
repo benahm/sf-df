@@ -245,3 +245,143 @@ export const sharingOwnerRule = (name: string, accessLevel = 'Read'): string =>
   });
 
 export const sharingRulesXml = (...rules: string[]): string => metadataXml('SharingRules', ...rules);
+
+// --- Apex -------------------------------------------------------------------------------------------------------
+
+export const apexMetaXml = (root: 'ApexClass' | 'ApexTrigger', apiVersion = '62.0'): string =>
+  metadataXml(root, `<apiVersion>${apiVersion}</apiVersion>`, '<status>Active</status>');
+
+export const apexClass = (name: string, body = '', apiVersion = '62.0'): Record<string, string> => ({
+  [`classes/${name}.cls`]: `public with sharing class ${name} {${body}}\n`,
+  [`classes/${name}.cls-meta.xml`]: apexMetaXml('ApexClass', apiVersion),
+});
+
+export const apexTrigger = (name: string, object: string, body = '', apiVersion = '62.0'): Record<string, string> => ({
+  [`triggers/${name}.trigger`]: `trigger ${name} on ${object} (before insert) {${body}}\n`,
+  [`triggers/${name}.trigger-meta.xml`]: apexMetaXml('ApexTrigger', apiVersion),
+});
+
+// --- Bundles ----------------------------------------------------------------------------------------------------
+
+export const lwcBundle = (
+  name: string,
+  js = `export default class extends LightningElement {}`
+): Record<string, string> => ({
+  [`lwc/${name}/${name}.js`]: `import { LightningElement } from 'lwc';\n${js}\n`,
+  [`lwc/${name}/${name}.html`]: '<template></template>\n',
+  [`lwc/${name}/${name}.js-meta.xml`]: metadataXml(
+    'LightningComponentBundle',
+    '<apiVersion>62.0</apiVersion>',
+    '<isExposed>false</isExposed>'
+  ),
+});
+
+export const auraBundle = (name: string, markup = '<aura:component></aura:component>'): Record<string, string> => ({
+  [`aura/${name}/${name}.cmp`]: `${markup}\n`,
+  [`aura/${name}/${name}Controller.js`]: '({ init: function () {} })\n',
+  [`aura/${name}/${name}Helper.js`]: '({ load: function () {} })\n',
+  [`aura/${name}/${name}.cmp-meta.xml`]: metadataXml(
+    'AuraDefinitionBundle',
+    '<apiVersion>62.0</apiVersion>',
+    `<description>${name}</description>`
+  ),
+});
+
+// --- Pages and actions ------------------------------------------------------------------------------------------
+
+export const layoutXml = (...fields: string[]): string =>
+  metadataXml(
+    'Layout',
+    `<layoutSections><customLabel>false</customLabel><detailHeading>false</detailHeading><editHeading>true</editHeading><label>Information</label><layoutColumns>${fields
+      .map((field) => `<layoutItems><behavior>Edit</behavior><field>${field}</field></layoutItems>`)
+      .join('')}</layoutColumns><style>OneColumn</style></layoutSections>`
+  );
+
+export const flexiPageXml = (label: string, template = 'flexipage:recordHomeTemplateDesktop'): string =>
+  metadataXml(
+    'FlexiPage',
+    `<masterLabel>${label}</masterLabel>`,
+    '<sobjectType>Invoice__c</sobjectType>',
+    `<template><name>${template}</name></template>`,
+    '<type>RecordPage</type>'
+  );
+
+export const quickActionXml = (label: string, type = 'Update'): string =>
+  metadataXml(
+    'QuickAction',
+    `<label>${label}</label>`,
+    '<optionsCreateFeedItem>false</optionsCreateFeedItem>',
+    `<type>${type}</type>`
+  );
+
+export const compactLayoutXml = (name: string, fields: string[]): string =>
+  metadataXml(
+    'CompactLayout',
+    `<fullName>${name}</fullName>`,
+    ...fields.map((field) => `<fields>${field}</fields>`),
+    `<label>${name}</label>`
+  );
+
+export const webLinkXml = (name: string, url: string): string =>
+  metadataXml(
+    'WebLink',
+    `<fullName>${name}</fullName>`,
+    '<availability>online</availability>',
+    '<displayType>button</displayType>',
+    '<linkType>url</linkType>',
+    `<masterLabel>${name}</masterLabel>`,
+    '<openType>replace</openType>',
+    '<protected>false</protected>',
+    `<url>${url}</url>`
+  );
+
+export const fieldSetXml = (name: string, fields: string[]): string =>
+  metadataXml(
+    'FieldSet',
+    `<fullName>${name}</fullName>`,
+    `<description>${name}</description>`,
+    ...fields.map(
+      (field) =>
+        `<displayedFields><field>${field}</field><isFieldManaged>false</isFieldManaged><isRequired>false</isRequired></displayedFields>`
+    ),
+    `<label>${name}</label>`
+  );
+
+export const businessProcessXml = (name: string, values: string[]): string =>
+  metadataXml(
+    'BusinessProcess',
+    `<fullName>${name}</fullName>`,
+    '<isActive>true</isActive>',
+    ...values.map((value) => `<values><fullName>${value}</fullName><default>false</default></values>`)
+  );
+
+// --- Custom metadata and value sets -----------------------------------------------------------------------------
+
+// Values as [field, value] pairs: field names such as Value__c are not camel case.
+export const customMetadataRecordXml = (label: string, values: Array<[string, string]>): string =>
+  `<?xml version="1.0" encoding="UTF-8"?>\n<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n    <label>${label}</label>\n    <protected>false</protected>\n${values
+    .map(
+      ([field, value]) => `    <values><field>${field}</field><value xsi:type="xsd:string">${value}</value></values>`
+    )
+    .join('\n')}\n</CustomMetadata>\n`;
+
+export const globalValueSetXml = (label: string, values: string[]): string =>
+  metadataXml(
+    'GlobalValueSet',
+    ...values.map(
+      (value) =>
+        `<customValue><fullName>${value}</fullName><default>false</default><label>${value}</label></customValue>`
+    ),
+    `<masterLabel>${label}</masterLabel>`,
+    '<sorted>false</sorted>'
+  );
+
+export const standardValueSetXml = (values: string[]): string =>
+  metadataXml(
+    'StandardValueSet',
+    '<sorted>false</sorted>',
+    ...values.map(
+      (value) =>
+        `<standardValue><fullName>${value}</fullName><default>false</default><label>${value}</label></standardValue>`
+    )
+  );

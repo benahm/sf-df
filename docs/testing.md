@@ -35,6 +35,10 @@ parent, changes spanning several commits.
 | `translations.test.ts` | Translations, CustomObjectTranslation |
 | `flow.test.ts` | Flow |
 | `container-rules.test.ts` | CustomLabels, Workflow, SharingRules |
+| `apex.test.ts` | ApexClass, ApexTrigger |
+| `bundles.test.ts` | LightningComponentBundle, AuraDefinitionBundle |
+| `pages-and-actions.test.ts` | Layout, FlexiPage, QuickAction, CompactLayout, WebLink, FieldSet, BusinessProcess |
+| `custom-metadata-and-value-sets.test.ts` | CustomMetadata records, GlobalValueSet, StandardValueSet |
 | `cross-cutting.test.ts` | untracked files, commit ranges |
 
 Tests share `test/delta/helpers/delta-repo.ts` (a temporary git repository and a readable view of the delta) and
