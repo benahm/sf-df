@@ -29,6 +29,20 @@ const isPartOfSurvivingParent = async (
   return pathExists(path.join(operation.targetSnapshot.rootDir, parentXml));
 };
 
+// A decomposed component (CustomObject, CustomObjectTranslation, Bot) is one folder of files that SDR resolves as a
+// whole. Only the changed file ships, with the parent file the deployment requires: the other children did not
+// change, and deploying a parent never removes the children it does not carry.
+const changedFilesOf = (
+  resolved: NonNullable<ResolvedOperation['resolvedMetadata']>,
+  relativePath: string
+): string[] | undefined => {
+  if (resolved.component?.type.strategies?.adapter !== 'decomposed' || !resolved.contentRelativePaths.includes(relativePath)) {
+    return undefined;
+  }
+
+  return [...new Set([resolved.xmlRelativePath, relativePath].filter((entry): entry is string => Boolean(entry)))];
+};
+
 // Verified on a sandbox: "The StandardValueSet called 'LeadSource' is standard and cannot be deleted". Listing one
 // would make the whole deployment fail, so a deleted file is only reported.
 const UNDELETABLE_TYPES = new Set(['StandardValueSet']);
@@ -83,8 +97,9 @@ export class GenericFileStrategy implements MetadataDeltaStrategy {
       };
     }
 
+    const changedFiles = changedFilesOf(resolved, operation.relativePath);
     const packageEntries = await Promise.all(
-      resolved.contentRelativePaths.map(async (relativeSourcePath) => {
+      (changedFiles ?? resolved.contentRelativePaths).map(async (relativeSourcePath) => {
         const absoluteSourcePath = toAbsolutePath(snapshot.rootDir, relativeSourcePath);
         if (!(await pathExists(absoluteSourcePath))) {
           return [];
@@ -107,7 +122,8 @@ export class GenericFileStrategy implements MetadataDeltaStrategy {
     );
 
     return {
-      dedupeKey: `package:${resolved.typeName}:${resolved.fullName}`,
+      // Each changed child of a decomposed component brings its own file.
+      dedupeKey: `package:${resolved.typeName}:${resolved.fullName}${changedFiles ? `:${operation.relativePath}` : ''}`,
       packageFileCopies,
       packageManifestEntries: manifestEntry
         ? [manifestEntry]

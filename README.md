@@ -43,7 +43,7 @@ sf df git delta --from main --to feature/my-branch --deploy-dir delta/deploy --d
 | Flag | Description |
 | --- | --- |
 | `-f, --from` | Starting git ref (commit, branch, tag). **Required.** |
-| `-t, --to` | Target git ref. Defaults to the current workspace. |
+| `-t, --to` | Target git ref. Defaults to the current workspace, files not added to git included. |
 | `-d, --deploy-dir` | Folder of the package to deploy. **Required.** |
 | `--destructive-dir` | Folder of the destructive changes. Defaults to `<deploy-dir>-destructive`, next to the deploy folder. Neither folder can be inside the other. |
 | `-s, --source-dir` | Metadata folder to inspect. Defaults to `force-app/main/default`. |
@@ -414,7 +414,8 @@ FLAG DESCRIPTIONS
 
   -t, --to=<value>  Git ref used as the target point.
 
-    Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used.
+    Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used as it is on
+    disk, including files not added to git yet (files excluded by .gitignore are left out).
 
   --destructive-dir=<value>  Directory where the destructive changes are generated.
 

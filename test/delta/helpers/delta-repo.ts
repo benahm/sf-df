@@ -103,13 +103,9 @@ export class DeltaRepo {
     return this.commit('base');
   }
 
-  // Delta from `from` (default HEAD) to `to` (default: the working tree). Against the working tree, changes are
-  // staged first: `git diff` does not see untracked files (see test/delta/types/cross-cutting.test.ts).
-  public async delta(options: { from?: string; to?: string; stage?: boolean } = {}): Promise<DeltaOutput> {
+  // Delta from `from` (default HEAD) to `to` (default: the working tree as it is on disk, staged or not).
+  public async delta(options: { from?: string; to?: string } = {}): Promise<DeltaOutput> {
     await rm(this.outputDir, { recursive: true, force: true });
-    if (!options.to && (options.stage ?? true)) {
-      this.git('add', '-A');
-    }
 
     const packageDir = path.join(this.outputDir, 'package');
     const destructiveDir = path.join(this.outputDir, 'destructive');

@@ -60,9 +60,9 @@ describe('delta by type: CustomObject and CustomField', () => {
       expect(delta.destructive).to.deep.equal([]);
     });
 
-    // Known gap, to decide: SDR resolves the object file to the whole decomposed object, so every field, list view
-    // and validation rule file is copied and deployed again, while package.xml only names the object. Not minimal.
-    it('copies every child file when only the object definition changes (not minimal)', async () => {
+    // SDR resolves the object file to the whole decomposed object; only the object file ships, since its fields,
+    // list views and validation rules did not change and deploying an object never removes the children it omits.
+    it('ships only the object file when only the object definition changes', async () => {
       await ctx.repo.baseline(baselineFiles);
       await ctx.repo.write({
         [OBJECT]: customObjectXml('Invoice', ['<enableHistory>true</enableHistory>']),
@@ -71,7 +71,20 @@ describe('delta by type: CustomObject and CustomField', () => {
       const delta = await ctx.repo.delta();
 
       expect(delta.package).to.deep.equal(['CustomObject:Invoice__c']);
-      expect(delta.packageFiles).to.have.members(Object.keys(baselineFiles));
+      expect(delta.packageFiles).to.deep.equal([OBJECT]);
+    });
+
+    it('ships the object file and the changed field when both change', async () => {
+      await ctx.repo.baseline(baselineFiles);
+      await ctx.repo.write({
+        [OBJECT]: customObjectXml('Invoice', ['<enableHistory>true</enableHistory>']),
+        [field('Amount__c')]: numberFieldXml('Amount__c', 'Total'),
+      });
+
+      const delta = await ctx.repo.delta();
+
+      expect(delta.package).to.have.members(['CustomObject:Invoice__c', 'CustomField:Invoice__c.Amount__c']);
+      expect(delta.packageFiles).to.have.members([OBJECT, field('Amount__c')]);
     });
 
     it('ships a changed list view or validation rule alone', async () => {

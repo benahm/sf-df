@@ -268,6 +268,7 @@ export const createLifecycleRepo = (repo: string, names: LifecycleNames, languag
       );
       textField('F1__c', 'F1 v1');
       textField('F2__c', 'F2');
+      textField('F3__c', 'F3');
       statusField(['A', 'B', 'C']);
       recordType('RT1', 'RT1 v1', ['A', 'B']);
       recordType('RT2', 'RT2', ['A']);
@@ -320,6 +321,7 @@ export const createLifecycleRepo = (repo: string, names: LifecycleNames, languag
       );
       fieldTranslation('F1__c', 'Champ 1 v1');
       fieldTranslation('F2__c', 'Champ 2');
+      fieldTranslation('F3__c', 'Champ 3');
       labelTranslations([
         ['SfDfQa_L1', 'Un v1'],
         ['SfDfQa_L2', 'Deux'],
@@ -376,7 +378,8 @@ export const createLifecycleRepo = (repo: string, names: LifecycleNames, languag
       remove('staticresources/SfDfQaRes/css/app.css');
       write('staticresources/SfDfQaRes/js/app.js', "console.log('v2');\n");
       write('staticresources/SfDfQaTxt.txt', 'v2\n');
-      // Only one field translation changes: the parent object translation must still ship.
+      // Only one field translation changes: the parent object translation must still ship, without F3's unchanged
+      // translation, which must stay in the org.
       fieldTranslation('F1__c', 'Champ 1 v2');
       remove(`objectTranslations/${obj}-${language}/F2__c.fieldTranslation-meta.xml`);
       labelTranslations([['SfDfQa_L1', 'Un v2']]);

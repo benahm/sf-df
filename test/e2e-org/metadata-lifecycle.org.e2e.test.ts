@@ -110,6 +110,8 @@ describe.skipIf(!enabled)('e2e org: metadata lifecycle', () => {
         [/flexipages\//, 'QA v2'],
         [/layouts\//, 'F2__c', false],
         [/objectTranslations\//, 'Champ 1 v2'],
+        // Not in the p2 delta: deploying an object translation keeps the field translations it does not carry.
+        [/objectTranslations\//, 'Champ 3'],
       ];
       for (const [file, text, shouldContain = true] of markers) {
         expect(readAll(retrieved, file).includes(text), `${file} ${shouldContain ? 'contains' : 'lacks'} ${text}`).toBe(

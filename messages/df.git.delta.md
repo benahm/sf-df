@@ -26,7 +26,7 @@ Git ref used as the target point.
 
 # flags.to.description
 
-Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used.
+Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used as it is on disk, including files not added to git yet (files excluded by .gitignore are left out).
 
 # flags.deploy-dir.summary
 

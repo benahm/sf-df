@@ -18,6 +18,8 @@ Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
 ### `git.ts`
 
 - Exécute `git diff --name-status -M`.
+- Sans `--to`, ajoute les fichiers non suivis (`git ls-files --others --exclude-standard`) comme des ajouts : le
+  workspace est pris tel qu'il est sur le disque.
 - Normalise les statuts en `add`, `modify`, `delete`, `rename`.
 - Travaille avec `core.quotePath=false` pour garder des chemins lisibles.
 

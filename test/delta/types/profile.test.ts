@@ -231,10 +231,11 @@ describe('delta by type: Profile', () => {
   });
 
   describe('removed items', () => {
-    // Known gap, to decide. Verified in a sandbox: deploying a profile never removes what its XML does not mention,
-    // even with the full file, so an item removed from the file stays granted in the org, and the delta says nothing
-    // about it. Setting the access to false in git (tested above) does revoke it.
-    it('ships nothing and warns about nothing when an item is removed from the file', async () => {
+    // Verified in a sandbox: deploying a profile never removes what its XML does not mention, even with the full
+    // file, so an item removed from the file stays granted in the org. The delta cannot revoke it (there is no
+    // destructive form for a profile item): it ships nothing and warns, naming the item. Setting the access to
+    // false in git (tested above) does revoke it.
+    it('ships nothing and warns about the item removed from the file', async () => {
       await ctx.repo.baseline({ [PROFILE]: profileXml(...base) });
       await ctx.repo.write({
         [PROFILE]: profileXml(...base.filter((item) => item !== classAccess('InvoiceService'))),
@@ -244,7 +245,29 @@ describe('delta by type: Profile', () => {
 
       expect(delta.package).to.deep.equal([]);
       expect(delta.destructive).to.deep.equal([]);
-      expect(delta.warnings).to.equal('');
+      expect(delta.warnings).to.contain('1 item(s) removed from Profile:Sales stay in the org: classAccesses InvoiceService');
+      expect(delta.warnings).to.contain('access set to false');
+    });
+
+    it('lists the first removed items and counts the others', async () => {
+      const fields = Array.from({ length: 12 }, (_, index) => fieldPermission(`Invoice__c.F${index}__c`));
+      await ctx.repo.baseline({ [PROFILE]: profileXml(...base, ...fields) });
+      await ctx.repo.write({ [PROFILE]: profileXml(...base) });
+
+      const { warnings } = await ctx.repo.delta();
+
+      expect(warnings).to.contain('12 item(s) removed from Profile:Sales');
+      expect(warnings).to.contain('fieldPermissions Invoice__c.F9__c and 2 more.');
+      expect(warnings).not.to.contain('F10__c');
+    });
+
+    it('warns about nothing when an access is set to false instead of removed', async () => {
+      await ctx.repo.baseline({ [PROFILE]: profileXml(...base) });
+      await ctx.repo.write({
+        [PROFILE]: profileXml(...withReplaced(classAccess('InvoiceService'), classAccess('InvoiceService', false))),
+      });
+
+      expect((await ctx.repo.delta()).warnings).to.equal('');
     });
 
     it('ships only the other changes when an item is removed together with a change', async () => {

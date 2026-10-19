@@ -19,7 +19,13 @@ export type XmlStrategyOptions = {
   // For types that stand for a whole org setting (a language's Translations): deleting the file must never
   // reach destructiveChanges.xml.
   neverDelete?: boolean;
+  // For types whose deployment never revokes what the XML does not mention (Profile): items removed from the file
+  // are reported, since the org keeps them.
+  warnOnRemovedItems?: boolean;
 };
+
+// Enough to recognise the removed items without flooding the output when a whole section goes away.
+const LISTED_REMOVED_ITEMS = 10;
 
 const parentSurvives = async (
   resolvedMetadata: ResolvedOperation['resolvedMetadata'],
@@ -44,6 +50,7 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
   private readonly qualifyChildNames: boolean;
   private readonly deactivateOnDelete?: XmlStrategyOptions['deactivateOnDelete'];
   private readonly neverDelete: boolean;
+  private readonly warnOnRemovedItems: boolean;
 
   public constructor(options: XmlStrategyOptions) {
     this.name = options.name;
@@ -55,6 +62,7 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
     this.qualifyChildNames = options.qualifyChildNames ?? false;
     this.deactivateOnDelete = options.deactivateOnDelete;
     this.neverDelete = options.neverDelete ?? false;
+    this.warnOnRemovedItems = options.warnOnRemovedItems ?? false;
   }
 
   public supports({ resolvedMetadata, manifestEntry }: ResolvedOperation): boolean {
@@ -80,15 +88,17 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
     const diff = diffCompositeXml(oldXml, newXml, this.rootName, this.rules, this.alwaysInclude);
 
     if (operation.kind === 'package') {
+      const warnings = this.removedItemsWarnings(diff, manifestEntry, operation.relativePath);
       if (!diff.packageXml) {
         if (!diff.destructiveXml || !manifestEntry) {
-          return undefined;
+          return warnings ? { dedupeKey: `${this.name}:package:${operation.relativePath}`, warnings } : undefined;
         }
 
         return {
           dedupeKey: `${this.name}:package:${operation.relativePath}`,
           destructiveTextFiles: new Map([[operation.relativePath, diff.destructiveXml]]),
           destructiveManifestEntries: this.toDestructiveEntries(diff, manifestEntry),
+          warnings,
         };
       }
 
@@ -101,6 +111,7 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
           : undefined,
         destructiveManifestEntries:
           diff.destructiveXml && manifestEntry ? this.toDestructiveEntries(diff, manifestEntry) : undefined,
+        warnings,
       };
     }
 
@@ -163,6 +174,25 @@ export class XmlCollectionDeltaStrategy implements MetadataDeltaStrategy {
       warnings: [`${this.name} does not produce partial destructive XML for ${component}; manifest-only delete was kept.`],
       destructiveManifestEntries: [manifestEntry],
     };
+  }
+
+  private removedItemsWarnings(
+    diff: XmlDiffResult,
+    manifestEntry: ManifestEntry | undefined,
+    relativePath: string
+  ): string[] | undefined {
+    if (!this.warnOnRemovedItems || diff.removedItems.length === 0) {
+      return undefined;
+    }
+
+    const component = manifestEntry ? `${manifestEntry.type}:${manifestEntry.fullName}` : relativePath;
+    const listed = diff.removedItems.slice(0, LISTED_REMOVED_ITEMS).map(({ fieldName, key }) => `${fieldName} ${key}`);
+    const more = diff.removedItems.length - listed.length;
+    return [
+      `${diff.removedItems.length} item(s) removed from ${component} stay in the org: ${listed.join(', ')}${
+        more > 0 ? ` and ${more} more` : ''
+      }. A deployment never revokes what the file does not mention; keep the item with its access set to false to revoke it.`,
+    ];
   }
 
   // Deleted children are listed by their own type (CustomLabel, WorkflowRule, ...) so destructiveChanges.xml

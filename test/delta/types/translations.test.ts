@@ -140,7 +140,7 @@ describe('delta by type: Translations and CustomObjectTranslation', () => {
       const delta = await ctx.repo.delta();
 
       expect(delta.package).to.deep.equal(['CustomObjectTranslation:Invoice__c-fr']);
-      expect(delta.packageFiles).to.include.members([OT, ft('Amount__c')]);
+      expect(delta.packageFiles).to.have.members([OT, ft('Amount__c')]);
       expect(await delta.packageFile(ft('Amount__c'))).to.contain('Montant TTC');
     });
 
@@ -151,16 +151,32 @@ describe('delta by type: Translations and CustomObjectTranslation', () => {
       const delta = await ctx.repo.delta();
 
       expect(delta.package).to.deep.equal(['CustomObjectTranslation:Invoice__c-fr']);
-      expect(delta.packageFiles).to.include.members([OT, ft('Due__c')]);
+      expect(delta.packageFiles).to.have.members([OT, ft('Due__c')]);
     });
 
-    it('ships a changed object translation', async () => {
+    it('ships the changed field translations of one object translation with their parent', async () => {
+      await ctx.repo.baseline(baseFiles);
+      await ctx.repo.write({
+        [ft('Amount__c')]: fieldTranslationXml('Amount__c', 'Montant TTC'),
+        [ft('Status__c')]: fieldTranslationXml('Status__c', 'État'),
+      });
+
+      const delta = await ctx.repo.delta();
+
+      expect(delta.package).to.deep.equal(['CustomObjectTranslation:Invoice__c-fr']);
+      expect(delta.packageFiles).to.have.members([OT, ft('Amount__c'), ft('Status__c')]);
+    });
+
+    // Deploying an object translation never removes the field translations it does not carry (see
+    // test/e2e-org/metadata-lifecycle.org.e2e.test.ts), so the unchanged ones stay out.
+    it('ships only the changed object translation file, without its field translations', async () => {
       await ctx.repo.baseline(baseFiles);
       await ctx.repo.write({ [OT]: objectTranslationXml('Facture client') });
 
       const delta = await ctx.repo.delta();
 
       expect(delta.package).to.deep.equal(['CustomObjectTranslation:Invoice__c-fr']);
+      expect(delta.packageFiles).to.deep.equal([OT]);
       expect(await delta.packageFile(OT)).to.contain('Facture client');
     });
 

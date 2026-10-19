@@ -1,3 +1,6 @@
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
 import { expect } from 'chai';
 
 import { useDeltaRepo } from '../helpers/delta-repo.js';
@@ -11,14 +14,40 @@ const FIELD = 'objects/Invoice__c/fields/Due__c.field-meta.xml';
 describe('delta by type: cross-cutting', () => {
   const ctx = useDeltaRepo();
 
-  // Known gap, to decide: against the working tree, the delta is `git diff HEAD`, which does not see files that
-  // were never added to git. A new component must be staged (or committed) to be deployed.
-  it('ignores a new file that is not added to git yet', async () => {
+  // Against the working tree, the delta is what is on disk, like `sf project deploy start`: `git diff HEAD` alone
+  // would miss files that were never added to git.
+  it('ships a new file that is not added to git yet', async () => {
     await ctx.repo.baseline({ [OBJECT]: customObjectXml('Invoice') });
     await ctx.repo.write({ [FIELD]: textFieldXml('Due__c') });
 
-    expect((await ctx.repo.delta({ stage: false })).package).to.deep.equal([]);
     expect((await ctx.repo.delta()).package).to.deep.equal(['CustomField:Invoice__c.Due__c']);
+  });
+
+  it('ignores a new file excluded by .gitignore', async () => {
+    await ctx.repo.baseline({ [OBJECT]: customObjectXml('Invoice') });
+    await writeFile(path.join(ctx.repo.root, '.gitignore'), 'tmp-output/\n**/fields/Due__c.field-meta.xml\n', 'utf8');
+    await ctx.repo.write({ [FIELD]: textFieldXml('Due__c') });
+
+    expect((await ctx.repo.delta()).package).to.deep.equal([]);
+  });
+
+  it('gives the same delta for a new file whether it is staged or not', async () => {
+    await ctx.repo.baseline({ [OBJECT]: customObjectXml('Invoice') });
+    await ctx.repo.write({ [FIELD]: textFieldXml('Due__c') });
+
+    const unstaged = await ctx.repo.delta();
+    ctx.repo.git('add', '-A');
+    const staged = await ctx.repo.delta();
+
+    expect(staged.package).to.deep.equal(unstaged.package);
+    expect(staged.packageFiles).to.deep.equal(unstaged.packageFiles);
+  });
+
+  it('never adds untracked files to a delta between two refs', async () => {
+    const from = await ctx.repo.baseline({ [OBJECT]: customObjectXml('Invoice') });
+    await ctx.repo.write({ [FIELD]: textFieldXml('Due__c') });
+
+    expect((await ctx.repo.delta({ from, to: 'HEAD' })).package).to.deep.equal([]);
   });
 
   it('gives the same delta between two commits as against the staged working tree', async () => {

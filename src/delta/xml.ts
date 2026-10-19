@@ -91,6 +91,8 @@ export type XmlDiffResult = {
   packageXml?: string;
   destructiveXml?: string;
   deletedItems: Array<{ fieldName: string; key: string }>;
+  // Items gone from the new file in collections without supportsDelete: nothing is generated for them.
+  removedItems: Array<{ fieldName: string; key: string }>;
   hasChanges: boolean;
   hasDeletes: boolean;
 };
@@ -280,6 +282,7 @@ export const diffCompositeXml = (
   const packageContent: Record<string, unknown> = {};
   const destructiveContent: Record<string, unknown> = {};
   const deletedKeys: XmlDiffResult['deletedItems'] = [];
+  const removedKeys: XmlDiffResult['removedItems'] = [];
   let hasPackageChanges = false;
   let hasDeletes = false;
 
@@ -315,13 +318,13 @@ export const diffCompositeXml = (
       hasPackageChanges = true;
     }
 
-    if (rule.supportsDelete) {
-      const deletedItems = oldItems.filter((item) => !newMap.has(rule.keySelector(item)));
-      if (deletedItems.length > 0) {
-        destructiveContent[fieldName] = deletedItems;
-        deletedKeys.push(...deletedItems.map((item) => ({ fieldName, key: rule.keySelector(item) })));
-        hasDeletes = true;
-      }
+    const deletedItems = oldItems.filter((item) => !newMap.has(rule.keySelector(item)));
+    if (rule.supportsDelete && deletedItems.length > 0) {
+      destructiveContent[fieldName] = deletedItems;
+      deletedKeys.push(...deletedItems.map((item) => ({ fieldName, key: rule.keySelector(item) })));
+      hasDeletes = true;
+    } else {
+      removedKeys.push(...deletedItems.map((item) => ({ fieldName, key: rule.keySelector(item) })));
     }
   }
 
@@ -341,6 +344,7 @@ export const diffCompositeXml = (
     packageXml: hasPackageChanges ? buildRoot(rootName, rootAttributes, packageContent) : undefined,
     destructiveXml: hasDeletes ? buildRoot(rootName, rootAttributes, destructiveContent) : undefined,
     deletedItems: deletedKeys,
+    removedItems: removedKeys,
     hasChanges: hasPackageChanges,
     hasDeletes,
   };

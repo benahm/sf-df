@@ -24,6 +24,17 @@ const parseStatus = (rawStatus: string): GitChangeStatus => {
 // Renames and copies carry two paths (source then destination); every other status carries one.
 const hasTwoPaths = (rawStatus: string): boolean => rawStatus.startsWith('R') || rawStatus.startsWith('C');
 
+// Files on disk that were never added to git, minus the ignored ones: `git diff` does not see them.
+const getUntrackedFiles = async (cwd: string): Promise<string[]> => {
+  const { stdout } = await execFileAsync('git', ['ls-files', '--others', '--exclude-standard', '--full-name', '-z'], {
+    cwd,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return stdout.split('\0').filter(Boolean);
+};
+
+// Without `to`, the target is the working tree as it is on disk, like `sf project deploy start`: new files count
+// whether or not they were added to git.
 export const getGitChanges = async (cwd: string, from: string, to?: string): Promise<GitChange[]> => {
   // -z keeps paths verbatim (no quoting) even when they contain tabs, quotes or newlines.
   const args = ['diff', '--name-status', '-z', '-M', from];
@@ -54,6 +65,10 @@ export const getGitChanges = async (cwd: string, from: string, to?: string): Pro
       path: secondPath ?? firstPath,
       previousPath: status === 'rename' ? firstPath : undefined,
     });
+  }
+
+  if (!to) {
+    changes.push(...(await getUntrackedFiles(cwd)).map((untrackedPath): GitChange => ({ status: 'add', path: untrackedPath })));
   }
 
   return changes;

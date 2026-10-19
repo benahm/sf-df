@@ -45,6 +45,9 @@ Fichier : [`src/delta/strategies/profile-strategy.ts`](../src/delta/strategies/p
 - Utilise des clés métier stables par collection : `field`, `object`, `apexClass`, `layout + recordType`, etc.
 - Réinjecte systématiquement quelques champs racine (`custom`, `description`, `userLicense`) pour garder un XML déployable.
 - Ne produit pas de destructive XML partiel ; en suppression, on garde l'entrée manifest et on émet un warning.
+- Un élément retiré du fichier (`fieldPermissions`, `classAccesses`...) ne produit rien à déployer mais un warning
+  (`warnOnRemovedItems`) qui nomme les dix premiers éléments retirés : le déploiement d'un profil ne révoque jamais ce
+  que le XML ne cite pas (vérifié en sandbox). Pour révoquer un accès, il faut le garder dans le fichier à `false`.
 
 ### `TranslationsStrategy`
 
@@ -93,9 +96,16 @@ Chacune est couverte par `test/delta/sandbox-findings.test.ts`.
 | Valeur retirée d'une picklist d'un `RecordType` | le déploiement remplace la liste de cette picklist | toutes les `picklistValues` du record type |
 | Picklist entière retirée d'un `RecordType` | même le fichier complet la laisse dans l'org | rien |
 | `RecordType` par défaut d'un profil supprimé | la désactivation passe | XML avec `active=false` |
-| Élément retiré d'un `Profile` | le déploiement ne retire jamais ce que le XML ne cite pas | rien (lacune : passer l'accès à `false` pour le révoquer) |
+| Élément retiré d'un `Profile` | le déploiement ne retire jamais ce que le XML ne cite pas | rien à déployer, warning qui nomme les éléments (passer l'accès à `false` pour le révoquer) |
 | `StandardValueSet` supprimé | `is standard and cannot be deleted` | rien de destructive, warning |
 | `GlobalValueSet` utilisée par un champ supprimé | le champ reste 15 jours dans la corbeille et bloque | rien à faire côté delta : suppression après purge |
+
+## Fichiers non suivis par git
+
+Sans `--to`, la cible est le workspace tel qu'il est sur le disque, comme pour `sf project deploy start` : en plus de
+`git diff <from>`, les fichiers jamais ajoutés à git (`git ls-files --others --exclude-standard`) entrent dans le delta
+comme des ajouts. Les fichiers exclus par `.gitignore` restent dehors. Entre deux refs (`--to`), seul l'historique git
+compte.
 
 ## Fichiers qui ne sont pas des metadata
 
@@ -118,7 +128,11 @@ Fichier : [`src/delta/strategies/generic-file-strategy.ts`](../src/delta/strateg
 
 - Sert de dernière stratégie du registre.
 - Réutilise le metadata déjà résolu par le moteur.
-- Copie tous les fichiers contenus dans le composant résolu.
+- Copie tous les fichiers contenus dans le composant résolu, sauf pour un composant décomposé (`CustomObject`,
+  `CustomObjectTranslation`, `Bot`) : SDR résout chacun de ses fichiers vers le composant entier, mais seuls le fichier
+  modifié et le fichier parent exigé par le déploiement partent (`X.object-meta.xml` modifié seul : ce fichier seul ;
+  `fieldTranslation` modifiée : elle et son `.objectTranslation`). Déployer le parent ne retire pas les enfants qu'il
+  n'emporte pas (vérifié en sandbox pour les traductions de champs, `test/e2e-org/metadata-lifecycle.org.e2e.test.ts`).
 - Pour un delete, ajoute seulement l'entrée au manifest destructive, sauf si le fichier supprimé n'est qu'une partie d'un
   composant décomposé qui existe toujours (ex. `fieldTranslation`) : warning seulement.
 - Exclut les dossiers `__tests__` des bundles LWC (tests Jest non déployables).

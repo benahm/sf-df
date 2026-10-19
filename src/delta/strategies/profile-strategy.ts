@@ -30,6 +30,8 @@ export class ProfileStrategy extends XmlCollectionDeltaStrategy {
       metadataTypes: ['Profile'],
       rootName: 'Profile',
       alwaysInclude: ['custom', 'description', 'userLicense'],
+      // Verified in a sandbox: deploying a profile, even whole, never revokes an access its XML does not mention.
+      warnOnRemovedItems: true,
       rules: keyedCollectionRules(PROFILE_COLLECTION_KEYS),
     });
   }
