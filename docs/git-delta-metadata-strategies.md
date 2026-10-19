@@ -94,6 +94,7 @@ Chacune est couverte par `test/delta/sandbox-findings.test.ts`.
 | Picklist entière retirée d'un `RecordType` | même le fichier complet la laisse dans l'org | rien |
 | `RecordType` par défaut d'un profil supprimé | la désactivation passe | XML avec `active=false` |
 | Élément retiré d'un `Profile` | le déploiement ne retire jamais ce que le XML ne cite pas | rien (lacune : passer l'accès à `false` pour le révoquer) |
+| `StandardValueSet` supprimé | `is standard and cannot be deleted` | rien de destructive, warning |
 | `GlobalValueSet` utilisée par un champ supprimé | le champ reste 15 jours dans la corbeille et bloque | rien à faire côté delta : suppression après purge |
 
 ## Fichiers qui ne sont pas des metadata
@@ -121,6 +122,7 @@ Fichier : [`src/delta/strategies/generic-file-strategy.ts`](../src/delta/strateg
 - Pour un delete, ajoute seulement l'entrée au manifest destructive, sauf si le fichier supprimé n'est qu'une partie d'un
   composant décomposé qui existe toujours (ex. `fieldTranslation`) : warning seulement.
 - Exclut les dossiers `__tests__` des bundles LWC (tests Jest non déployables).
+- Ne liste jamais un `StandardValueSet` supprimé (l'API refuse de le supprimer) : warning seulement.
 
 Ce fallback couvre aussi les bundles quand le resolver retourne un répertoire complet dans `contentRelativePaths`.
 

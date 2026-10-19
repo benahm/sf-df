@@ -132,6 +132,18 @@ describe('sandbox findings', () => {
       expect(await destructiveManifest(result)).not.to.contain('<name>Flow</name>');
       expect(result.warnings.join('\n')).to.contain('Flow:My_Flow cannot be deleted by name');
     });
+
+    it('never lists a deleted standard value set ("is standard and cannot be deleted")', async () => {
+      await commitBaseline({
+        'standardValueSets/LeadSource.standardValueSet-meta.xml': `${XML_HEADER}<StandardValueSet ${NS}><sorted>false</sorted><standardValue><fullName>Web</fullName><default>false</default><label>Web</label></standardValue></StandardValueSet>\n`,
+      });
+      await removeFiles('standardValueSets/LeadSource.standardValueSet-meta.xml');
+
+      const result = await runDelta();
+
+      expect(await destructiveManifest(result)).not.to.contain('StandardValueSet');
+      expect(result.warnings.join('\n')).to.contain('StandardValueSet:LeadSource cannot be deleted');
+    });
   });
 
   describe('deletions that would remove far more than what was deleted', () => {

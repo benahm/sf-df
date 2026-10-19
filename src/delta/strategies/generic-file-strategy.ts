@@ -29,6 +29,10 @@ const isPartOfSurvivingParent = async (
   return pathExists(path.join(operation.targetSnapshot.rootDir, parentXml));
 };
 
+// Verified on a sandbox: "The StandardValueSet called 'LeadSource' is standard and cannot be deleted". Listing one
+// would make the whole deployment fail, so a deleted file is only reported.
+const UNDELETABLE_TYPES = new Set(['StandardValueSet']);
+
 export class GenericFileStrategy implements MetadataDeltaStrategy {
   public readonly name = 'generic';
   public readonly isFallback = true;
@@ -45,6 +49,15 @@ export class GenericFileStrategy implements MetadataDeltaStrategy {
         return {
           dedupeKey: `destructive:${operation.relativePath}`,
           warnings: [`Unable to resolve metadata type for deleted path ${operation.relativePath}.`],
+        };
+      }
+
+      if (UNDELETABLE_TYPES.has(manifestEntry.type)) {
+        return {
+          dedupeKey: `destructive-refused:${manifestEntry.type}:${manifestEntry.fullName}`,
+          warnings: [
+            `${manifestEntry.type}:${manifestEntry.fullName} cannot be deleted through the Metadata API; it is left in the org.`,
+          ],
         };
       }
 
