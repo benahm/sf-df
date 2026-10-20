@@ -39,32 +39,48 @@ parent, changes spanning several commits.
 | `bundles.test.ts` | LightningComponentBundle, AuraDefinitionBundle |
 | `pages-and-actions.test.ts` | Layout, FlexiPage, QuickAction, CompactLayout, WebLink, FieldSet, BusinessProcess |
 | `custom-metadata-and-value-sets.test.ts` | CustomMetadata records, GlobalValueSet, StandardValueSet |
-| `cross-cutting.test.ts` | untracked and ignored files, commit ranges |
+| `cross-cutting.test.ts` | untracked and ignored files, commit ranges, parity of the test helper with git |
 
-Tests share `test/delta/helpers/delta-repo.ts` (a temporary git repository and a readable view of the delta) and
+Tests share `test/delta/helpers/delta-repo.ts` (a temporary repository and a readable view of the delta) and
 `test/delta/helpers/metadata-xml.ts` (builders for metadata source files). A test whose expected result depends on how
 Salesforce reacts says in a comment whether it was verified in a sandbox; a known gap says so in its name or comment.
 
+## Tests with and without git
+
+`useDeltaRepo()` gives a `FolderDeltaRepo` by default: each commit is a plain folder, the helper computes the changed
+files itself and hands both folders to `generateDelta` through its `source` option. No git process runs, a test takes
+a fraction of a second. `useDeltaRepo({ git: true })` gives a real git repository (`GitDeltaRepo`), same API.
+
+A test goes on git only when it is about git: untracked or ignored files, staging, `git` commands, refs that are not
+`HEAD`, `HEAD~n` or an id returned by `commit()`, and rename detection. `FolderDeltaRepo` only knows the renames made
+with `rename()`; git also pairs a deleted file with a similar new one. `cross-cutting.test.ts` checks that both
+flavours give the same delta on a scenario mixing additions, changes, deletions and renames.
+
 ## Keeping the unit tests fast
 
-Most of the time of a delta test goes to git processes, which cost 100-250 ms each on Windows. Two things keep the
-suite usable:
+Most of the time of a git-based delta test goes to git processes, which cost 100-250 ms each on Windows: that is why
+most delta tests run without git (see above). Two things keep the remaining git tests usable:
 
 - mocha runs the test files in parallel (`"parallel": true` and `"jobs": 4` in `.mocharc.json`). Each
   file runs whole in one worker, files share nothing: a test that changes the process state (`process.chdir`,
   `process.env`) restores it in its `after` hook, and a test never depends on another file. A single file still runs
   with `npx mocha test/delta/types/apex.test.ts`.
-- `DeltaRepo.create()` copies an empty repository (initialised and configured once per worker) instead of running
-  `git init` and `git config` for every test, and `commit()` reads the new sha from `.git` instead of running
-  `git rev-parse`. A new helper avoids extra git processes the same way.
+- `GitDeltaRepo.create()` copies an empty repository (initialised and configured once per worker, automatic
+  maintenance off) instead of running `git init` and `git config` for every test, and `commit()` reads the new sha
+  from `.git` instead of running `git rev-parse`. A new helper avoids extra git processes the same way.
+- ts-node only transpiles (`"ts-node": { "transpileOnly": true }` in `tsconfig.json`): type-checking every file in
+  every worker took 15-30 s per worker. Types are still checked by `npm run test:compile`, the first step of
+  `npm test`, and by `npm run compile`.
 
 Timing assertions (`test/merge/xml-merge.test.ts`, `test/delta/xml.test.ts`) guard against an algorithm gone quadratic,
 not against a slow machine: their budget stays well above the normal duration measured while the other files run in
 parallel.
 
 Measured on Windows, 8 cores, `nyc mocha "test/**/*.test.ts"` (300 tests): 910 s run serially with a `git init` per
-test, 388 s now. More workers is not faster: git processes saturate the CPU (503 s with 7 workers, 436 s with 3), hence
-`"jobs": 4`.
+test, 388 s in parallel. More workers is not faster: git processes saturate the CPU (503 s with 7 workers, 436 s with 3),
+hence `"jobs": 4`. Then, on a machine where any process takes ~200 ms to start, the whole `npm test` (309 tests) went
+from 969 s to 503 s with the delta tests off git and ts-node transpiling only; `mocha` alone, without nyc, takes 221 s.
+The remaining time is mostly the git-based tests (`test/deploy/deploy.test.ts` first) and nyc.
 
 ## NUTs
 

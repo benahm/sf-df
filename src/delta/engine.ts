@@ -206,6 +206,23 @@ export const resolveOutputDirs = (deployDir: string, destructiveDir?: string): {
   return { packageDir, destructiveDir: resolvedDestructiveDir };
 };
 
+// What a delta compares: the changed files, then the two sides they are read from (old, new). By default git:
+// `from` against `to` or the working tree. The unit tests pass two plain folders instead, without any git process
+// (test/delta/helpers/delta-repo.ts).
+export type DeltaSource = {
+  getChanges(): Promise<GitChange[]>;
+  createSnapshots(changedPaths: string[]): Promise<[SnapshotRef, SnapshotRef]>;
+};
+
+const gitSource = (snapshotManager: SnapshotManager, repoRoot: string, from: string, to?: string): DeltaSource => ({
+  getChanges: () => getGitChanges(repoRoot, from, to),
+  createSnapshots: async (changedPaths) =>
+    Promise.all([
+      snapshotManager.createFrom(from, changedPaths),
+      to ? snapshotManager.createFrom(to, changedPaths) : snapshotManager.createWorkspace(),
+    ]),
+});
+
 export const generateDelta = async (options: {
   repoRoot: string;
   from: string;
@@ -214,10 +231,12 @@ export const generateDelta = async (options: {
   deployDir: string;
   // Defaults to `<deployDir>-destructive`, next to the deploy folder.
   destructiveDir?: string;
+  source?: DeltaSource;
 }): Promise<DeltaResult> => {
   const { packageDir, destructiveDir } = resolveOutputDirs(options.deployDir, options.destructiveDir);
   const sourceDir = (options.sourceDir ?? 'force-app/main/default').replaceAll('\\', '/').replace(/\/+$/, '');
   const snapshotManager = new SnapshotManager(options.repoRoot, sourceDir);
+  const source = options.source ?? gitSource(snapshotManager, options.repoRoot, options.from, options.to);
   const registry = new StrategyRegistry();
   const packageEntries = new Set<string>();
   const destructiveEntries = new Set<string>();
@@ -236,16 +255,13 @@ export const generateDelta = async (options: {
   await ensureDir(packageDir);
   await ensureDir(destructiveDir);
 
-  const sourceChanges = (await getGitChanges(options.repoRoot, options.from, options.to)).filter(
+  const sourceChanges = (await source.getChanges()).filter(
     (change) => change.path.startsWith(`${sourceDir}/`) || (change.previousPath?.startsWith(`${sourceDir}/`) ?? false)
   );
   // Both sides only need the components of the changed files: a rename or a partial bundle delete looks up the
   // same component on the other side.
   const changedPaths = sourceChanges.flatMap((change) => (change.previousPath ? [change.previousPath, change.path] : [change.path]));
-  const [oldSnapshot, newSnapshot] = await Promise.all([
-    snapshotManager.createFrom(options.from, changedPaths),
-    options.to ? snapshotManager.createFrom(options.to, changedPaths) : snapshotManager.createWorkspace(),
-  ]);
+  const [oldSnapshot, newSnapshot] = await source.createSnapshots(changedPaths);
   const isIgnoredInOld = forceIgnoreOf(oldSnapshot);
   const isIgnoredInNew = forceIgnoreOf(newSnapshot);
 
