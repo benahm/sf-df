@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { readFileSync, rmSync } from 'node:fs';
+import { cp, mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -48,6 +49,24 @@ export type DeltaOutput = {
   destructiveFile(relativePath: string): Promise<string>;
 };
 
+const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' });
+
+// Each git process costs 100-250 ms on Windows, and tests create hundreds of repositories: they are copied from an
+// empty, configured repository built once per process instead of running `git init` and `git config` every time.
+let templateRoot: Promise<string> | undefined;
+
+const createTemplate = async (): Promise<string> => {
+  const root = await mkdtemp(path.join(tmpdir(), 'sf-df-delta-template-'));
+  process.once('exit', () => rmSync(root, { recursive: true, force: true }));
+  // An empty --template leaves out the sample hooks: fewer files to copy.
+  git(root, 'init', '-q', '--template=');
+  git(root, 'config', 'user.email', 'delta@example.com');
+  git(root, 'config', 'user.name', 'Delta Tests');
+  git(root, 'config', 'core.autocrlf', 'false');
+  await writeFile(path.join(root, '.gitignore'), 'tmp-output/\n', 'utf8');
+  return root;
+};
+
 export class DeltaRepo {
   private constructor(public readonly root: string) {}
 
@@ -56,17 +75,14 @@ export class DeltaRepo {
   }
 
   public static async create(): Promise<DeltaRepo> {
+    templateRoot ??= createTemplate();
     const repo = new DeltaRepo(await mkdtemp(path.join(tmpdir(), 'sf-df-delta-')));
-    repo.git('init', '-q');
-    repo.git('config', 'user.email', 'delta@example.com');
-    repo.git('config', 'user.name', 'Delta Tests');
-    repo.git('config', 'core.autocrlf', 'false');
-    await writeFile(path.join(repo.root, '.gitignore'), 'tmp-output/\n', 'utf8');
+    await cp(await templateRoot, repo.root, { recursive: true });
     return repo;
   }
 
   public git(...args: string[]): string {
-    return execFileSync('git', args, { cwd: this.root, encoding: 'utf8' });
+    return git(this.root, ...args);
   }
 
   public async write(files: Record<string, string>): Promise<void> {
@@ -95,7 +111,7 @@ export class DeltaRepo {
   public commit(message = 'change'): string {
     this.git('add', '-A');
     this.git('commit', '-q', '--allow-empty', '-m', message);
-    return this.git('rev-parse', 'HEAD').trim();
+    return this.head();
   }
 
   public async baseline(files: Record<string, string>): Promise<string> {
@@ -134,6 +150,12 @@ export class DeltaRepo {
 
   public async cleanup(): Promise<void> {
     await rm(this.root, { recursive: true, force: true });
+  }
+
+  // Same as `git rev-parse HEAD` without a git process: the branch ref stays a loose file, nothing packs it.
+  private head(): string {
+    const head = readFileSync(path.join(this.root, '.git', 'HEAD'), 'utf8').trim();
+    return head.startsWith('ref: ') ? readFileSync(path.join(this.root, '.git', head.slice(5)), 'utf8').trim() : head;
   }
 }
 

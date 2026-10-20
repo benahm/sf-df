@@ -199,8 +199,10 @@ describe('mergeMetadataXml', () => {
     expect(mergeMetadataXml(labelsXml([['A', 'a'], ['B', 'b']]), withMarkers, labelsXml([['A', 'a2'], ['B', 'b']]))).to.equal(undefined);
   });
 
+  // The budgets of the two tests below catch an algorithm gone quadratic (minutes on 50 000 items), not a slow
+  // machine: a merge takes ~2 s, and up to twice that while the other test files run in parallel.
   it('merges a large profile quickly', function () {
-    this.timeout(20_000);
+    this.timeout(60_000);
     const base = profileXml(50_000);
     const ours = profileXml(50_000, [10]);
     const theirs = profileXml(50_000, [40_000]);
@@ -211,12 +213,12 @@ describe('mergeMetadataXml', () => {
 
     expect(conflicts).to.equal(0);
     expect(content).to.equal(profileXml(50_000, [10, 40_000]));
-    expect(elapsed).to.be.lessThan(4000);
+    expect(elapsed).to.be.lessThan(15_000);
   });
 
   // Each insertion used to rebuild the index of the whole file: 10 000 additions took minutes.
   it('merges thousands of items added by theirs quickly', function () {
-    this.timeout(20_000);
+    this.timeout(60_000);
     const all = Array.from({ length: 50_000 }, (_, index) => index);
     const fieldsXml = (indexes: number[], editable: number[] = []): string =>
       `${HEADER}<Profile ${NS}>\n${indexes.map((index) => fieldPermission(`Account.F${String(index).padStart(5, '0')}__c`, editable.includes(index))).join('')}</Profile>\n`;
@@ -228,7 +230,7 @@ describe('mergeMetadataXml', () => {
 
     expect(conflicts).to.equal(0);
     expect(content).to.equal(fieldsXml(all, [1]));
-    expect(elapsed).to.be.lessThan(4000);
+    expect(elapsed).to.be.lessThan(15_000);
   });
 });
 

@@ -45,6 +45,27 @@ Tests share `test/delta/helpers/delta-repo.ts` (a temporary git repository and a
 `test/delta/helpers/metadata-xml.ts` (builders for metadata source files). A test whose expected result depends on how
 Salesforce reacts says in a comment whether it was verified in a sandbox; a known gap says so in its name or comment.
 
+## Keeping the unit tests fast
+
+Most of the time of a delta test goes to git processes, which cost 100-250 ms each on Windows. Two things keep the
+suite usable:
+
+- mocha runs the test files in parallel (`"parallel": true` and `"jobs": 4` in `.mocharc.json`). Each
+  file runs whole in one worker, files share nothing: a test that changes the process state (`process.chdir`,
+  `process.env`) restores it in its `after` hook, and a test never depends on another file. A single file still runs
+  with `npx mocha test/delta/types/apex.test.ts`.
+- `DeltaRepo.create()` copies an empty repository (initialised and configured once per worker) instead of running
+  `git init` and `git config` for every test, and `commit()` reads the new sha from `.git` instead of running
+  `git rev-parse`. A new helper avoids extra git processes the same way.
+
+Timing assertions (`test/merge/xml-merge.test.ts`, `test/delta/xml.test.ts`) guard against an algorithm gone quadratic,
+not against a slow machine: their budget stays well above the normal duration measured while the other files run in
+parallel.
+
+Measured on Windows, 8 cores, `nyc mocha "test/**/*.test.ts"` (300 tests): 910 s run serially with a `git init` per
+test, 388 s now. More workers is not faster: git processes saturate the CPU (503 s with 7 workers, 436 s with 3), hence
+`"jobs": 4`.
+
 ## NUTs
 
 `npm run test:nuts` runs `test/**/*.nut.ts` with `@salesforce/cli-plugins-testkit`: the real command is executed through
