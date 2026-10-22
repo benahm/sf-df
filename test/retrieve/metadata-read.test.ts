@@ -1,9 +1,11 @@
 import { expect } from 'chai';
 
 import {
+  buildListMetadataEnvelope,
   buildReadMetadataEnvelope,
   formatMetadataFile,
   isTransientError,
+  parseListMetadataResponse,
   parseReadMetadataResponse,
   SoapFaultError,
 } from '../../src/retrieve/metadata-read.js';
@@ -16,6 +18,21 @@ describe('readMetadata as raw XML', () => {
 
       expect(envelope).to.contain('<m:sessionId>00D!token</m:sessionId>');
       expect(envelope).to.contain('<m:type>Profile</m:type><m:fullNames>R&amp;D &lt;Team&gt;</m:fullNames>');
+    });
+  });
+
+  describe('listMetadata', () => {
+    it('asks one type and returns the decoded full names', () => {
+      expect(buildListMetadataEnvelope('token', 'Profile')).to.contain(
+        '<m:listMetadata><m:queries><m:type>Profile</m:type></m:queries></m:listMetadata>'
+      );
+      const response =
+        '<soapenv:Envelope><soapenv:Body><listMetadataResponse>' +
+        '<result><createdById>005</createdById><fullName>Admin</fullName><type>Profile</type></result>' +
+        '<result><fullName>R&amp;D</fullName><type>Profile</type></result>' +
+        '</listMetadataResponse></soapenv:Body></soapenv:Envelope>';
+
+      expect(parseListMetadataResponse(response)).to.deep.equal(['Admin', 'R&D']);
     });
   });
 

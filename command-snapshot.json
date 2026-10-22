@@ -110,14 +110,19 @@
             "sourcepath"
         ],
         "flagChars": [
+            "a",
             "d",
+            "m",
             "o",
-            "r"
+            "r",
+            "x"
         ],
         "flags": [
             "api-version",
             "flags-dir",
             "json",
+            "manifest",
+            "metadata",
             "output-dir",
             "source-dir",
             "target-org"

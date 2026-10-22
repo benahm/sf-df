@@ -46,7 +46,7 @@ describe('retrieveProfiles', () => {
     );
   });
 
-  it('writes into --output-dir and leaves the source untouched', async () => {
+  it('writes into <output-dir>/profiles and leaves the source untouched', async () => {
     const adminPath = await writeProfile('Admin.profile-meta.xml');
     const outputDir = path.join(root, 'out');
 
@@ -56,8 +56,10 @@ describe('retrieveProfiles', () => {
       outputDir,
     });
 
-    expect(result.profiles[0].filePath).to.equal(path.join(outputDir, 'Admin.profile-meta.xml'));
-    expect(await readFile(path.join(outputDir, 'Admin.profile-meta.xml'), 'utf8')).to.contain('<custom>false</custom>');
+    expect(result.profiles[0].filePath).to.equal(path.join(outputDir, 'profiles', 'Admin.profile-meta.xml'));
+    expect(await readFile(path.join(outputDir, 'profiles', 'Admin.profile-meta.xml'), 'utf8')).to.contain(
+      '<custom>false</custom>'
+    );
     expect(await readFile(adminPath, 'utf8')).to.equal(STUB);
   });
 

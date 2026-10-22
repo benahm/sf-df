@@ -10,15 +10,27 @@ const XSI_NS = 'http://www.w3.org/2001/XMLSchema-instance';
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export const buildReadMetadataEnvelope = (sessionId: string, type: string, fullNames: string[]): string =>
+const buildEnvelope = (sessionId: string, body: string): string =>
   '<?xml version="1.0" encoding="UTF-8"?>' +
   `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:m="${METADATA_NS}">` +
   `<soapenv:Header><m:SessionHeader><m:sessionId>${escapeXml(
     sessionId
   )}</m:sessionId></m:SessionHeader></soapenv:Header>` +
-  `<soapenv:Body><m:readMetadata><m:type>${escapeXml(type)}</m:type>` +
-  fullNames.map((fullName) => `<m:fullNames>${escapeXml(fullName)}</m:fullNames>`).join('') +
-  '</m:readMetadata></soapenv:Body></soapenv:Envelope>';
+  `<soapenv:Body>${body}</soapenv:Body></soapenv:Envelope>`;
+
+export const buildReadMetadataEnvelope = (sessionId: string, type: string, fullNames: string[]): string =>
+  buildEnvelope(
+    sessionId,
+    `<m:readMetadata><m:type>${escapeXml(type)}</m:type>` +
+      fullNames.map((fullName) => `<m:fullNames>${escapeXml(fullName)}</m:fullNames>`).join('') +
+      '</m:readMetadata>'
+  );
+
+export const buildListMetadataEnvelope = (sessionId: string, type: string): string =>
+  buildEnvelope(
+    sessionId,
+    `<m:listMetadata><m:queries><m:type>${escapeXml(type)}</m:type></m:queries></m:listMetadata>`
+  );
 
 export class SoapFaultError extends Error {
   public constructor(public readonly faultCode: string, message: string) {
@@ -43,16 +55,31 @@ export type ReadMetadataRecord = { fullName: string; body: string };
 
 // Records of a readMetadata response, in request order. A name unknown to the org comes back as
 // `<records xsi:nil="true"/>`: it is returned as undefined, never as an empty record (writing it would wipe the file).
-export const parseReadMetadataResponse = (response: string): Array<ReadMetadataRecord | undefined> => {
+const assertResponse = (response: string, call: string): void => {
   const fault = FAULT.exec(response);
   if (fault) {
     throw new SoapFaultError(fault[1], decodeText(fault[2]));
   }
 
-  if (!response.includes('readMetadataResponse')) {
-    throw new Error(`Unexpected readMetadata response: ${response.slice(0, 200)}`);
+  if (!response.includes(`${call}Response`)) {
+    throw new Error(`Unexpected ${call} response: ${response.slice(0, 200)}`);
   }
+};
 
+const LIST_RESULT = /<result>([\s\S]*?)<\/result>/g;
+const LISTED_FULL_NAME = /<fullName>([^<]*)<\/fullName>/;
+
+// Full names of a listMetadata response, as the org returns them.
+export const parseListMetadataResponse = (response: string): string[] => {
+  assertResponse(response, 'listMetadata');
+  return [...response.matchAll(LIST_RESULT)]
+    .map((match) => LISTED_FULL_NAME.exec(match[1])?.[1])
+    .filter((fullName): fullName is string => fullName !== undefined)
+    .map(decodeText);
+};
+
+export const parseReadMetadataResponse = (response: string): Array<ReadMetadataRecord | undefined> => {
+  assertResponse(response, 'readMetadata');
   return [...response.matchAll(RECORD)].map((match) => {
     const content = match[2];
     const fullName = content === undefined ? undefined : FULL_NAME.exec(content);
@@ -174,13 +201,35 @@ export const readMetadataRaw = async (
   type: string,
   fullNames: string[],
   options: ReadMetadataOptions = {}
-): Promise<Array<ReadMetadataRecord | undefined>> => {
+): Promise<Array<ReadMetadataRecord | undefined>> =>
+  callMetadataSoap(
+    connection,
+    (token) => buildReadMetadataEnvelope(token, type, fullNames),
+    parseReadMetadataResponse,
+    options
+  );
+
+// Full names of the components of a type in the org. Sent like readMetadata, for the same session refresh and
+// retries: jsforce metadata.list uses its own transport.
+export const listMetadataNames = async (
+  connection: Connection,
+  type: string,
+  options: ReadMetadataOptions = {}
+): Promise<string[]> =>
+  callMetadataSoap(connection, (token) => buildListMetadataEnvelope(token, type), parseListMetadataResponse, options);
+
+const callMetadataSoap = async <T>(
+  connection: Connection,
+  envelope: (sessionId: string) => string,
+  parse: (response: string) => T,
+  options: ReadMetadataOptions
+): Promise<T> => {
   const send = async (token: string): Promise<string> =>
     connection.request<string>(
       {
         method: 'POST',
         url: `/services/Soap/m/${connection.getApiVersion()}`,
-        body: buildReadMetadataEnvelope(token, type, fullNames),
+        body: envelope(token),
         headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: '""' },
       },
       { responseType: 'text/plain' }
@@ -201,10 +250,10 @@ export const readMetadataRaw = async (
   };
 
   const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
-  const attempt = async (retriesLeft: number, refreshed: boolean): Promise<Array<ReadMetadataRecord | undefined>> => {
+  const attempt = async (retriesLeft: number, refreshed: boolean): Promise<T> => {
     const token = connection.accessToken ?? '';
     try {
-      return parseReadMetadataResponse(await responseText(token));
+      return parse(await responseText(token));
     } catch (error) {
       // The session id travels in the SOAP envelope, which jsforce does not refresh: refresh once and retry.
       if (!refreshed && isExpiredSession(error)) {

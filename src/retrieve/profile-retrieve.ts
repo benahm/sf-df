@@ -21,9 +21,10 @@ export type ProfileRetrieveResult = {
 
 export type ProfileRetrieveOptions = ReadMetadataOptions & {
   connection: Connection;
-  sourcePath: string;
-  // Profiles already found in sourcePath, so that the source is not resolved twice.
+  // Profiles to retrieve. When omitted, every profile found in sourcePath.
   sources?: ProfileSource[];
+  sourcePath?: string | string[];
+  // Profiles are written to <outputDir>/profiles, where `sf project retrieve start --output-dir` writes them.
   outputDir?: string;
   concurrency?: number;
   onProgress?: (profile: RetrievedProfile, done: number, total: number) => void;
@@ -36,11 +37,11 @@ const DEFAULT_CONCURRENCY = 5;
 
 export type ProfileSource = { fullName: string; filePath: string };
 
-// Profiles of a source file or folder, named as the org names them. SDR keeps the encoded file name
+// Profiles of source files or folders, named as the org names them. SDR keeps the encoded file name
 // (`System Admin %2B Bulk Delete Permission`), which is also the API full name, and ignores files that are not
 // profiles.
-export const findProfileSources = (sourcePath: string): ProfileSource[] =>
-  ComponentSet.fromSource(sourcePath)
+export const findProfileSources = (sourcePath: string | string[]): ProfileSource[] =>
+  ComponentSet.fromSource({ fsPaths: Array.isArray(sourcePath) ? sourcePath : [sourcePath] })
     .getSourceComponents()
     .toArray()
     .filter((component) => component.type.name === 'Profile' && component.xml)
@@ -61,7 +62,7 @@ const writeFileAtomic = async (filePath: string, content: string): Promise<void>
 
 const retrieveOne = async (source: ProfileSource, options: ProfileRetrieveOptions): Promise<RetrievedProfile> => {
   const filePath = options.outputDir
-    ? path.join(options.outputDir, path.basename(source.filePath))
+    ? path.join(options.outputDir, 'profiles', path.basename(source.filePath))
     : source.filePath;
   try {
     const [record] = await readMetadataRaw(options.connection, 'Profile', [source.fullName], options);
@@ -84,7 +85,7 @@ const retrieveOne = async (source: ProfileSource, options: ProfileRetrieveOption
 };
 
 export const retrieveProfiles = async (options: ProfileRetrieveOptions): Promise<ProfileRetrieveResult> => {
-  const sources = options.sources ?? findProfileSources(options.sourcePath);
+  const sources = options.sources ?? findProfileSources(options.sourcePath ?? []);
   const profiles: RetrievedProfile[] = [];
   let next = 0;
   let done = 0;

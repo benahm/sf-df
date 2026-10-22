@@ -23,6 +23,22 @@ fichier obtenu avec tous les composants traduisibles (202 s), commentaires `<!--
 chose pour `CustomObjectTranslation:Account-fr` (19 s seul, 68 s avec `CustomObject:Account`). D'où l'absence de
 `translations retrieve`.
 
+## Flags alignés sur `sf project retrieve start`
+
+Mêmes noms, mêmes lettres, mêmes exclusions que `sf project retrieve start` (`-o`, `-a`, `-d`, `-m`, `-x`, `-r`).
+
+- `-d`, `-m` et `-x` s'excluent. Sans aucun des trois : tous les profils des `packageDirectories` du projet.
+- `-m Profile` = tous les profils de l'org ; `-m "Profile:Sales*"` résout le joker sur l'org (`listMetadata`), comme le
+  natif. Un nom exact n'interroge pas l'org. `-m` refuse un autre type.
+- `-x` ne garde que les membres `Profile` du manifeste ; `*` = tous les profils de l'org.
+- Un profil déjà dans le projet est écrasé sur place, même si son nom est donné décodé (`+` pour `%2B`). Un nouveau va
+  dans `<package par défaut>/main/default/profiles`.
+- `-r` écrit dans `<output-dir>/profiles`, comme le natif (avant : à plat dans `<output-dir>`).
+- Écart volontaire : le natif interdit `-r` avec `-d`. Ici c'est permis, pour ne pas casser `--sourcepath` +
+  `--outputdir` hérités de `mdt:profile:retrieve`.
+- `listMetadata` passe par le même SOAP brut que `readMetadata` : `connection.metadata.list` de jsforce a son propre
+  transport, sans le rafraîchissement de session ni les reprises.
+
 ## Comment
 
 1. Les profils sont trouvés par SDR (`ComponentSet.fromSource`). Le nom complet est le nom de fichier encodé

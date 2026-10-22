@@ -120,22 +120,36 @@ request: on its own, a profile comes back without its field, object, class, layo
 retrieve` reads each profile with the Metadata API `readMetadata` call, which returns all of them, and writes it in the
 layout of `sf project retrieve start`, so that git only shows real changes.
 
+The flags are those of `sf project retrieve start`.
+
 ```bash
 # Overwrite every profile of the project with the complete profile of the org
-sf df profile retrieve --source-dir force-app/main/default/profiles --target-org my-sandbox
+sf df profile retrieve --target-org my-sandbox
 
-# One profile, written into another folder
-sf df profile retrieve --source-dir "force-app/main/default/profiles/Admin.profile-meta.xml" --output-dir retrieved
+# The profiles of a folder
+sf df profile retrieve --source-dir force-app/main/default/profiles
+
+# One profile, and every profile of the org whose name starts with Sales
+sf df profile retrieve --metadata Profile:Admin --metadata "Profile:Sales*"
+
+# The profiles of a manifest, written to retrieved/profiles
+sf df profile retrieve --manifest manifest/package.xml --output-dir retrieved
 ```
 
 | Flag | Description |
 | --- | --- |
-| `-d, --source-dir` | Profile file or folder. Only the profiles it contains are retrieved. **Required.** |
-| `-r, --output-dir` | Where to write the profiles. Defaults to overwriting the source files. |
+| `-d, --source-dir` | Profile files or folders. Only the profiles they contain are retrieved. Repeatable. |
+| `-m, --metadata` | `Profile` (every profile of the org) or `Profile:Name`, `*` wildcard resolved against the org. Repeatable. |
+| `-x, --manifest` | `package.xml`: its `Profile` members are retrieved, the other types are ignored. |
+| `-r, --output-dir` | Profiles are written to `<output-dir>/profiles`. Defaults to overwriting the project's files. |
 | `-o, --target-org` | Org to read from. |
-| `--api-version` | Defaults to `sourceApiVersion` of `sfdx-project.json`: the content of a profile depends on it. |
+| `-a, --api-version` | Defaults to `sourceApiVersion` of `sfdx-project.json`: the content of a profile depends on it. |
 
-A profile missing from the org is reported and its file is left untouched; the command then exits with 1. On a
+`-d`, `-m` and `-x` are mutually exclusive. Without any of them, every profile of the project's package directories is
+retrieved. A profile selected by `-m` or `-x` that is not in the project yet is written to the default package
+directory (`main/default/profiles`), as `sf project retrieve start` does.
+
+A profile missing from the org is reported and no file is written for it; the command then exits with 1. On a
 600-profile sandbox, 50 complete profiles (97 MB) take about 2 minutes. Network errors and transient org errors are
 retried 3 times.
 
