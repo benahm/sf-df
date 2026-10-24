@@ -39,6 +39,15 @@ export const componentsInSource = (sourceDir: string): Set<string> => {
   return entries;
 };
 
+// A scratch org is a production-like org (not a sandbox) with an expiration date.
+export const isScratchOrg = (targetOrg: string): boolean => {
+  const result = parseSfJson<{ result?: { records?: Array<{ IsSandbox: boolean; TrialExpirationDate: string | null }> } }>(
+    runSf(['data', 'query', '-q', 'SELECT IsSandbox, TrialExpirationDate FROM Organization', '-o', targetOrg, '--json'], tmpdir())
+  );
+  const org = result.result?.records?.[0];
+  return Boolean(org && !org.IsSandbox && org.TrialExpirationDate);
+};
+
 export type DeployOutcome = { status: number; failures: string[]; errorMessage?: string };
 
 // Deploys a delta in one transaction (package.xml + post-destructive changes), like a CI pipeline would.

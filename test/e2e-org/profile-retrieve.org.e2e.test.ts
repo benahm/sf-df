@@ -62,7 +62,7 @@ describe.skipIf(!enabled)('sf df profile retrieve on a real org', () => {
     const result = await retrieveProfiles({ connection, sourcePath: nativePath, outputDir });
 
     expect(result.profiles).toEqual([
-      { fullName: profileName, filePath: path.join(outputDir, path.basename(nativePath)), status: 'retrieved' },
+      { fullName: profileName, filePath: path.join(outputDir, 'profiles', path.basename(nativePath)), status: 'retrieved' },
     ]);
     const complete = readFileSync(result.profiles[0].filePath, 'utf8');
     const nativeElements = topLevelElements(native);

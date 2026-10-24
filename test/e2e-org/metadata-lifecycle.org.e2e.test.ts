@@ -8,7 +8,7 @@ import { generateDelta } from '../../src/delta/engine.js';
 import { buildManifestXml } from '../../src/delta/manifest.js';
 import type { DeltaResult } from '../../src/delta/types.js';
 import { SOURCE_DIR, createLifecycleRepo, lifecycleNames } from './metadata-lifecycle.fixture.js';
-import { componentsInSource, deployDelta, readAll, retrieveFromOrg, runSf } from './org-state.js';
+import { componentsInSource, deployDelta, isScratchOrg, readAll, retrieveFromOrg, runSf } from './org-state.js';
 
 // Replays on a real org the lifecycle that was used to harden `sf df git delta`: add the most common metadata
 // types, modify / partially delete / rename them, revoke permission set accesses, then delete everything.
@@ -19,13 +19,15 @@ import { componentsInSource, deployDelta, readAll, retrieveFromOrg, runSf } from
 //
 // The org needs the translation workbench with E2E_ORG_LANGUAGE (default: fr) enabled. Only SfDfQa* components
 // are created; the test deletes them at the end. Deleted objects stay in the org recycle bin for 15 days.
+// On a scratch org only, it also adds a business process to Opportunity and a value to the LeadSource standard value
+// set: the API cannot delete a standard value set, so a sandbox would keep the value.
 
 const targetOrg = process.env.E2E_TARGET_ORG;
 const language = process.env.E2E_ORG_LANGUAGE ?? 'fr';
 const enabled = process.env.RUN_E2E_ORG === 'true' && Boolean(targetOrg);
 
-// Checked through file contents only: a language and the label container always exist in the org.
-const NOT_CHECKED_FOR_EXISTENCE = new Set(['Translations', 'CustomObjectTranslation', 'CustomLabels']);
+// Checked through file contents only: a language, the label container and a standard value set always exist.
+const NOT_CHECKED_FOR_EXISTENCE = new Set(['Translations', 'CustomObjectTranslation', 'CustomLabels', 'StandardValueSet']);
 
 describe.skipIf(!enabled)('e2e org: metadata lifecycle', () => {
   const names = lifecycleNames(Date.now().toString(36).slice(-5));
@@ -84,7 +86,10 @@ describe.skipIf(!enabled)('e2e org: metadata lifecycle', () => {
     'deploys every delta of the lifecycle and leaves the org matching the repository',
     async () => {
       repoRoot = await mkdtemp(path.join(tmpdir(), 'sf-df-e2e-lifecycle-'));
-      phases = createLifecycleRepo(repoRoot, names, language);
+      const standard = isScratchOrg(targetOrg!)
+        ? { leadSourceXml: readAll(retrieveFromOrg(['StandardValueSet:LeadSource'], targetOrg!).dir, /standardValueSets\//) }
+        : undefined;
+      phases = createLifecycleRepo(repoRoot, names, language, standard);
       phases.init();
 
       await runPhase('p1');
@@ -92,7 +97,21 @@ describe.skipIf(!enabled)('e2e org: metadata lifecycle', () => {
       const p2 = await runPhase('p2');
       expect(p2.delta.warnings.join('\n')).toContain(`RecordType:${names.obj}.RT2 cannot be deleted`);
       expect(p2.delta.warnings.join('\n')).toContain(`Flow:${names.flow2} cannot be deleted by name`);
+      expect(p2.delta.warnings.join('\n')).toContain(
+        `1 item(s) removed from Profile:SfDfQa_Profile stay in the org: fieldPermissions ${names.obj}.F3__c`
+      );
       const retrieved = expectOrgToMatch(p2.expected, [`RecordType:${names.obj}.RT2`, `Flow:${names.flow2}`]);
+      // The profile delta is partial: only F1 and the new class ship, the rest of the profile stays as it was.
+      const profile = readAll(retrieved, /profiles\//).replaceAll(/\s/g, '');
+      expect(profile).toContain(`<editable>false</editable><field>${names.obj}.F1__c</field>`);
+      expect(profile).toContain(`<editable>true</editable><field>${names.obj}.F3__c</field>`);
+      expect(profile).toContain('<apexClass>SfDfQaA</apexClass><enabled>true</enabled>');
+      expect(profile).toContain('<apexClass>SfDfQaD</apexClass><enabled>true</enabled>');
+      expect(profile).toContain(`<layout>${names.obj}-SfDfQaLayout</layout>`);
+      const valueSet = readAll(retrieved, /globalValueSets\//);
+      expect(valueSet).toContain('<fullName>Z</fullName>');
+      // A value removed from the file is deactivated, not deleted.
+      expect(valueSet.replaceAll(/\s/g, '')).toContain('<fullName>Y</fullName><default>false</default><isActive>false</isActive>');
       const markers: Array<[RegExp, string, boolean?]> = [
         [/recordTypes\/RT2\./, '<active>false</active>'],
         [/recordTypes\/RT1\./, 'RT1 v2'],
@@ -108,6 +127,8 @@ describe.skipIf(!enabled)('e2e org: metadata lifecycle', () => {
         [/workflows\//, '&quot;v2&quot;'],
         [/email\/.*Tpl1\.email$/, 'Hello v2'],
         [/flexipages\//, 'QA v2'],
+        [/permissionsetgroups\//, 'SfDfQa_PS2'],
+        [/mutingpermissionsets\//, `<field>${names.obj}.F1__c</field>`],
         [/layouts\//, 'F2__c', false],
         [/objectTranslations\//, 'Champ 1 v2'],
         // Not in the p2 delta: deploying an object translation keeps the field translations it does not carry.
@@ -125,8 +146,20 @@ describe.skipIf(!enabled)('e2e org: metadata lifecycle', () => {
       expect(permissionSet).not.toContain('SfDfQaA');
       expect(permissionSet).not.toContain('SfDfQa_Perm2');
 
+      if (standard) {
+        const standardObjects = readAll(
+          retrieveFromOrg(['BusinessProcess:Opportunity.SfDfQa_BP', 'StandardValueSet:LeadSource'], targetOrg!).dir,
+          /./
+        );
+        expect(standardObjects).toContain('<fullName>Qualification</fullName>');
+        expect(standardObjects).toContain('SfDfQa Source v2');
+      }
+
       const p3 = await runPhase('p3');
       expect(p3.delta.warnings.join('\n')).toContain(`Translations:${language} is never deleted`);
+      if (standard) {
+        expect(p3.delta.warnings.join('\n')).toContain('StandardValueSet:LeadSource cannot be deleted');
+      }
       expectOrgToMatch(new Set(), [`Flow:${names.flow}`, `Flow:${names.flow2}`]);
     },
     60 * 60 * 1000

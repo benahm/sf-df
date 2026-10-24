@@ -79,7 +79,7 @@ Fichier : [`src/delta/strategies/flow-strategy.ts`](../src/delta/strategies/flow
 
 ## Règles de suppression vérifiées en sandbox
 
-Ces règles viennent de déploiements réels (scénario rejouable : `test/e2e-org/metadata-lifecycle.org.e2e.test.ts`).
+Ces règles viennent de déploiements réels en sandbox et en scratch org (scénario rejouable : `test/e2e-org/metadata-lifecycle.org.e2e.test.ts`).
 Chacune est couverte par `test/delta/sandbox-findings.test.ts`.
 
 | Situation | Ce que Salesforce fait / refuse | Ce que génère le delta |
@@ -97,6 +97,8 @@ Chacune est couverte par `test/delta/sandbox-findings.test.ts`.
 | Picklist entière retirée d'un `RecordType` | même le fichier complet la laisse dans l'org | rien |
 | `RecordType` par défaut d'un profil supprimé | la désactivation passe | XML avec `active=false` |
 | Élément retiré d'un `Profile` | le déploiement ne retire jamais ce que le XML ne cite pas | rien à déployer, warning qui nomme les éléments (passer l'accès à `false` pour le révoquer) |
+| Valeur retirée d'une `GlobalValueSet` | la valeur reste dans l'org, désactivée (`isActive=false`) | fichier complet ; la suppression définitive se fait dans Setup |
+| Objet Edit ou Delete muté dans un `MutingPermissionSet` | `invalid parameter value`, même en déployant le fichier complet | rien : limite Salesforce (muter l'Edit d'un champ passe) |
 | `StandardValueSet` supprimé | `is standard and cannot be deleted` | rien de destructive, warning |
 | `GlobalValueSet` utilisée par un champ supprimé | le champ reste 15 jours dans la corbeille et bloque | rien à faire côté delta : suppression après purge |
 

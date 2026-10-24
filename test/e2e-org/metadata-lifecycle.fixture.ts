@@ -4,7 +4,8 @@ import path from 'node:path';
 
 // Builds a git repo whose commits walk the most common metadata types through their whole lifecycle:
 // p1 adds everything, p2 modifies / partially deletes / renames, p2b revokes permission set accesses,
-// p3 deletes everything. Every component is prefixed with SfDfQa and the objects carry a per-run suffix,
+// p3 deletes everything. Components on standard objects (a business process on Opportunity, a value added to the
+// LeadSource standard value set) are only built for a disposable org, see StandardObjects. Every component is prefixed with SfDfQa and the objects carry a per-run suffix,
 // because Salesforce keeps deleted objects in its recycle bin and refuses to recreate the same name.
 
 export const SOURCE_DIR = 'force-app/main/default';
@@ -12,16 +13,20 @@ const API = '64.0';
 const H = '<?xml version="1.0" encoding="UTF-8"?>\n';
 const NS = 'xmlns="http://soap.sforce.com/2006/04/metadata"';
 
-export type LifecycleNames = { obj: string; setting: string; flow: string; flow2: string };
+export type LifecycleNames = { obj: string; setting: string; flow: string; flow2: string; valueSet: string };
+
+// Built only on a scratch org: they change standard objects, and the API cannot delete a standard value set.
+export type StandardObjects = { leadSourceXml: string };
 
 export const lifecycleNames = (suffix: string): LifecycleNames => ({
   obj: `SfDfQa_Obj${suffix}__c`,
   setting: `SfDfQa_Set${suffix}`,
   flow: `SfDfQa_Flow${suffix}`,
   flow2: `SfDfQa_FlowB${suffix}`,
+  valueSet: `SfDfQa_GVS${suffix}`,
 });
 
-export const createLifecycleRepo = (repo: string, names: LifecycleNames, language = 'fr') => {
+export const createLifecycleRepo = (repo: string, names: LifecycleNames, language = 'fr', standard?: StandardObjects) => {
   const { obj, setting } = names;
   const git = (...args: string[]): string => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
   const write = (rel: string, content: string): void => {
@@ -228,6 +233,68 @@ export const createLifecycleRepo = (repo: string, names: LifecycleNames, languag
       `translations/${language}.translation-meta.xml`,
       xml('Translations', entries.map(([n, v]) => `<customLabels><label>${v}</label><name>${n}</name></customLabels>`).join(''))
     );
+  const profile = (fields: Array<[string, boolean]>, classes: string[]): void =>
+    write(
+      'profiles/SfDfQa_Profile.profile-meta.xml',
+      xml(
+        'Profile',
+        [
+          ...classes.map((c) => `<classAccesses><apexClass>${c}</apexClass><enabled>true</enabled></classAccesses>`),
+          '<custom>true</custom>',
+          ...fields.map(
+            ([f, editable]) =>
+              `<fieldPermissions><editable>${editable}</editable><field>${obj}.${f}</field><readable>true</readable></fieldPermissions>`
+          ),
+          `<layoutAssignments><layout>${obj}-SfDfQa Layout</layout></layoutAssignments>`,
+          `<objectPermissions><allowCreate>true</allowCreate><allowDelete>false</allowDelete><allowEdit>true</allowEdit><allowRead>true</allowRead><modifyAllRecords>false</modifyAllRecords><object>${obj}</object><viewAllRecords>false</viewAllRecords></objectPermissions>`,
+          '<userLicense>Salesforce</userLicense>',
+        ].join('\n')
+      )
+    );
+  const permissionSetGroup = (permissionSets: string[]): void =>
+    write(
+      'permissionsetgroups/SfDfQa_PSG.permissionsetgroup-meta.xml',
+      xml(
+        'PermissionSetGroup',
+        `<label>SfDfQa PSG</label><mutingPermissionSets>SfDfQa_Mute</mutingPermissionSets>${permissionSets
+          .map((ps) => `<permissionSets>${ps}</permissionSets>`)
+          .join('')}`
+      )
+    );
+  // Muting object Edit or Delete is refused by Salesforce ("invalid parameter value"), muting a field's Edit is not.
+  const mutingPermissionSet = (muteF1Edit: boolean): void =>
+    write(
+      'mutingpermissionsets/SfDfQa_Mute.mutingpermissionset-meta.xml',
+      xml(
+        'MutingPermissionSet',
+        `${muteF1Edit ? `<fieldPermissions><editable>true</editable><field>${obj}.F1__c</field><readable>false</readable></fieldPermissions>` : ''}<label>SfDfQa Mute</label><objectPermissions><allowCreate>true</allowCreate><allowDelete>false</allowDelete><allowEdit>false</allowEdit><allowRead>false</allowRead><modifyAllRecords>false</modifyAllRecords><object>${obj}</object><viewAllRecords>false</viewAllRecords></objectPermissions>`
+      )
+    );
+  const globalValueSet = (values: string[]): void =>
+    write(
+      `globalValueSets/${names.valueSet}.globalValueSet-meta.xml`,
+      xml(
+        'GlobalValueSet',
+        `${values.map((v) => `<customValue><fullName>${v}</fullName><default>false</default><label>${v}</label></customValue>`).join('')}<masterLabel>SfDfQa GVS</masterLabel><sorted>false</sorted>`
+      )
+    );
+  const businessProcess = (values: string[]): void =>
+    write(
+      'objects/Opportunity/businessProcesses/SfDfQa_BP.businessProcess-meta.xml',
+      xml(
+        'BusinessProcess',
+        `<fullName>SfDfQa_BP</fullName><isActive>true</isActive>${values.map((v) => `<values><fullName>${v}</fullName><default>false</default></values>`).join('')}`
+      )
+    );
+  // The org's LeadSource values plus one SfDfQa value.
+  const leadSource = (lbl: string): void => {
+    const original = standard!.leadSourceXml;
+    const at = original.lastIndexOf('</standardValue>') + '</standardValue>'.length;
+    write(
+      'standardValueSets/LeadSource.standardValueSet-meta.xml',
+      `${original.slice(0, at)}\n    <standardValue><fullName>SfDfQa_Source</fullName><default>false</default><label>${lbl}</label></standardValue>${original.slice(at)}`
+    );
+  };
 
   const phases = {
     init(): void {
@@ -326,6 +393,14 @@ export const createLifecycleRepo = (repo: string, names: LifecycleNames, languag
         ['SfDfQa_L1', 'Un v1'],
         ['SfDfQa_L2', 'Deux'],
       ]);
+      profile([['F1__c', true], ['F3__c', true]], ['SfDfQaA']);
+      mutingPermissionSet(false);
+      permissionSetGroup(['SfDfQa_PS']);
+      globalValueSet(['X', 'Y']);
+      if (standard) {
+        businessProcess(['Prospecting', 'Closed Won', 'Closed Lost']);
+        leadSource('SfDfQa Source v1');
+      }
       commit('p1');
     },
 
@@ -383,6 +458,16 @@ export const createLifecycleRepo = (repo: string, names: LifecycleNames, languag
       fieldTranslation('F1__c', 'Champ 1 v2');
       remove(`objectTranslations/${obj}-${language}/F2__c.fieldTranslation-meta.xml`);
       labelTranslations([['SfDfQa_L1', 'Un v2']]);
+      // F1 loses edit, F3 is removed from the file (a profile deploy never revokes what it does not cite), a new class.
+      profile([['F1__c', false]], ['SfDfQaA', 'SfDfQaD']);
+      mutingPermissionSet(true);
+      write('permissionsets/SfDfQa_PS2.permissionset-meta.xml', xml('PermissionSet', '<hasActivationRequired>false</hasActivationRequired><label>SfDfQa PS2</label>'));
+      permissionSetGroup(['SfDfQa_PS', 'SfDfQa_PS2']);
+      globalValueSet(['X', 'Z']);
+      if (standard) {
+        businessProcess(['Prospecting', 'Qualification', 'Closed Won', 'Closed Lost']);
+        leadSource('SfDfQa Source v2');
+      }
       commit('p2');
     },
 
