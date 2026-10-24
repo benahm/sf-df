@@ -8,7 +8,7 @@
         "@oclif/core": "^5.0.0",
         "@salesforce/core": "^9.1.11",
         "@salesforce/sf-plugins-core": "^13.0.4",
-        "@salesforce/source-deploy-retrieve": "^13.6.0",
+        "@salesforce/source-deploy-retrieve": "^13.7.0",
         "fast-xml-parser": "5.5.3",
       },
       "devDependencies": {
@@ -412,7 +412,7 @@
 
     "@salesforce/sf-plugins-core": ["@salesforce/sf-plugins-core@13.0.7", "", { "dependencies": { "@inquirer/confirm": "^6.1.1", "@inquirer/password": "^5.1.1", "@oclif/core": "^5.0.0", "@oclif/table": "^1.0.0", "@salesforce/core": "^9.1.10", "@salesforce/kit": "^4.0.0", "@salesforce/ts-types": "^3.2.0", "ansis": "^3.3.2", "cli-progress": "^3.12.0", "terminal-link": "^3.0.0" } }, "sha512-nfVYno70TORUITGAMhGo0eD62M7LxTiD5TnpnRLOuG6ygt0TVz60NWX6eJRvmxOkHKqAK5hWjPOZXAYqV8JZUg=="],
 
-    "@salesforce/source-deploy-retrieve": ["@salesforce/source-deploy-retrieve@13.6.0", "", { "dependencies": { "@salesforce/core": "^9.3.7", "@salesforce/kit": "^4.0.0", "@salesforce/ts-types": "^3.2.0", "@salesforce/types": "^1.6.0", "fast-levenshtein": "^3.0.0", "fast-xml-parser": "^5.7.3", "got": "^11.8.6", "graceful-fs": "^4.2.11", "ignore": "^5.3.2", "jszip": "^3.10.1", "mime": "2.6.0", "minimatch": "^9.0.9", "proxy-agent": "^6.5.0", "yaml": "^2.9.0" } }, "sha512-9Y3XxBpqh+u5aK7d8YdK9lfmMqjvARJjvcoWQoltXXE4TkrZlMK1eYsjTwcTGsktrazEXjlFldetrXn+K05w8Q=="],
+    "@salesforce/source-deploy-retrieve": ["@salesforce/source-deploy-retrieve@13.7.0", "", { "dependencies": { "@salesforce/core": "^9.3.7", "@salesforce/kit": "^4.0.0", "@salesforce/ts-types": "^3.2.0", "@salesforce/types": "^1.6.0", "fast-levenshtein": "^3.0.0", "fast-xml-parser": "^5.7.3", "got": "^11.8.6", "graceful-fs": "^4.2.11", "ignore": "^5.3.2", "jszip": "^3.10.1", "mime": "2.6.0", "minimatch": "^9.0.9", "proxy-agent": "^6.5.0", "yaml": "^2.9.0" } }, "sha512-cANPedW09Hzt8MMoUJUKJrg14/SV25QtcIsTcjyBxARIhlg5uQIZfqL21p6xtxkzINBrRDj6t/yM/XRY2aeGsA=="],
 
     "@salesforce/ts-types": ["@salesforce/ts-types@3.2.2", "", {}, "sha512-3t+/+CzdL2RSOPUvakbg7ICKgu+y5r+lBKYjcVa5TzeLkAnWad8TH98qgurndLZLXHVyW3rA4AM0oTpH+TZZVA=="],
 
