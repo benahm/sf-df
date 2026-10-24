@@ -21,7 +21,7 @@
     "eslint-config-salesforce-typescript": "^7.0.0",
     "eslint-plugin-sf-plugin": "^3.0.0",
     "oclif": "^5.0.2",
-    "oxfmt": "^0.40.0",
+    "oxfmt": "^0.74.0",
     "oxlint": "^1.55.0",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.0",
