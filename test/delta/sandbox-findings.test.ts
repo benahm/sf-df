@@ -5,6 +5,7 @@ import path from 'node:path';
 import { expect } from 'chai';
 
 import { formatMetadataFile, parseReadMetadataResponse } from '../../src/retrieve/metadata-read.js';
+import { makeDeployable } from '../../src/retrieve/profile-deployable.js';
 import { findProfileSources } from '../../src/retrieve/profile-retrieve.js';
 import { useDeltaRepo } from './helpers/delta-repo.js';
 
@@ -293,5 +294,35 @@ describe('sandbox findings: profile retrieve', () => {
 `;
 
     expect(formatMetadataFile('Profile', body)).to.equal(retrieved);
+  });
+
+  // Found by check-only deployments of the Admin profile retrieved from the same sandbox: 103 of its 480 standard tab
+  // settings are refused (`not a valid tab`) and missing from TabDefinition.
+  it('the org refuses its own settings for the standard tabs missing from TabDefinition: they are left out', () => {
+    const xml = formatMetadataFile(
+      'Profile',
+      '<tabVisibilities><tab>standard-Account</tab><visibility>DefaultOn</visibility></tabVisibilities>' +
+        '<tabVisibilities><tab>standard-AccountAccountRelation</tab><visibility>DefaultOn</visibility></tabVisibilities>'
+    );
+
+    expect(makeDeployable(xml, { standardTabs: new Set(['standard-Account']) }).leftOut).to.deep.equal([
+      { section: 'tabVisibilities', name: 'standard-AccountAccountRelation' },
+    ]);
+  });
+
+  // Two ProfileLayout rows for one person account record type, returned by readMetadata and by sf project retrieve
+  // start alike, refused at deployment (`Duplicate layoutAssignment`). Which one applies can't be told.
+  it('two layouts assigned to one record type are both left out', () => {
+    const assignment = (layout: string): string =>
+      `<layoutAssignments><layout>${layout}</layout><recordType>PersonAccount.Client</recordType></layoutAssignments>`;
+    const xml = formatMetadataFile(
+      'Profile',
+      assignment('PersonAccount-Client Layout') + assignment('PersonAccount-Retail Layout')
+    );
+
+    expect(makeDeployable(xml, {})).to.deep.equal({
+      xml: formatMetadataFile('Profile', ''),
+      leftOut: [{ section: 'layoutAssignments', name: 'PersonAccount.Client' }],
+    });
   });
 });

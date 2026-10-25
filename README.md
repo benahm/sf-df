@@ -113,52 +113,96 @@ was deleted in git. These rules come from real deployments and are covered by te
 
 Details: [docs/git-delta-metadata-strategies.md](docs/git-delta-metadata-strategies.md).
 
-## Complete profiles: `sf df profile retrieve`
+## Retrieve complete profiles: `sf df profile retrieve`
 
 `sf project retrieve start -m Profile:Admin` only returns the accesses to the components retrieved in the same
-request: on its own, a profile comes back without its field, object, class, layout or tab accesses. `sf df profile
-retrieve` reads each profile with the Metadata API `readMetadata` call, which returns all of them, and writes it in the
-layout of `sf project retrieve start`, so that git only shows real changes.
+request: on its own, a profile comes back without its field, object, class, layout or tab accesses.
+`sf df profile retrieve` reads each profile with the Metadata API `readMetadata` call, which returns all of them, and
+writes it in the same layout, so that git only shows real changes.
 
-The flags are those of `sf project retrieve start`.
+Retrieve the other types with `sf project retrieve start` itself, then the profiles with this command: a native
+retrieve that includes profiles overwrites them with partial ones.
 
 ```bash
-# Overwrite every profile of the project with the complete profile of the org
+# Every profile of the project, overwritten with the org's version
 sf df profile retrieve --target-org my-sandbox
-
-# The profiles of a folder
-sf df profile retrieve --source-dir force-app/main/default/profiles
 
 # One profile, and every profile of the org whose name starts with Sales
 sf df profile retrieve --metadata Profile:Admin --metadata "Profile:Sales*"
 
-# The profiles of a manifest, written to retrieved/profiles
-sf df profile retrieve --manifest manifest/package.xml --output-dir retrieved
+# Only the accesses to the components of the project
+sf df profile retrieve --metadata Profile:Admin --scope project
 ```
 
 | Flag | Description |
 | --- | --- |
-| `-d, --source-dir` | Profile files or folders. Only the profiles they contain are retrieved. Repeatable. |
+| `-d, --source-dir` | Profile files or folders: the profiles they contain are retrieved. Repeatable. |
 | `-m, --metadata` | `Profile` (every profile of the org) or `Profile:Name`, `*` wildcard resolved against the org. Repeatable. |
-| `-x, --manifest` | `package.xml`: its `Profile` members are retrieved, the other types are ignored. |
+| `-x, --manifest` | `package.xml`: its `Profile` members are retrieved. |
 | `-r, --output-dir` | Profiles are written to `<output-dir>/profiles`. Defaults to overwriting the project's files. |
 | `-o, --target-org` | Org to read from. |
 | `-a, --api-version` | Defaults to `sourceApiVersion` of `sfdx-project.json`: the content of a profile depends on it. |
+| `--entries` | `active` (default): granted accesses, plus the entries already in the project's file with the org's value, so that a revocation deploys. `all`: every entry. |
+| `--scope` | `org` (default): accesses to every component of the org. `project`: only to the project's components and to standard ones, so that the profile deploys to an org that lacks the others. |
 
-`-d`, `-m` and `-x` are mutually exclusive. Without any of them, every profile of the project's package directories is
-retrieved. A profile selected by `-m` or `-x` that is not in the project yet is written to the default package
-directory (`main/default/profiles`), as `sf project retrieve start` does.
+`-d`, `-m` and `-x` are mutually exclusive. Without any of them, every profile of the project is retrieved. A profile
+selected by `-m` or `-x` that is not in the project yet is written to the default package directory (`main/default`),
+as `sf project retrieve start` does.
+
+The profile is written so that it deploys back: the org returns settings for standard tabs it refuses at deployment
+(`not a valid tab`), and may hold two layouts for one record type (`Duplicate layoutAssignment`). Both are left out,
+with a warning.
 
 A profile missing from the org is reported and no file is written for it; the command then exits with 1. On a
 600-profile sandbox, 50 complete profiles (97 MB) take about 2 minutes. Network errors and transient org errors are
 retried 3 times.
 
-The retrieved profile grants access to **every** component of the org, including fields and classes that are not in
-the project (managed packages, changes made directly in the org). Deploying it to an org where one of them is missing
-fails.
+With `--scope org`, the profile grants access to **every** component of the org, including fields and classes that
+are not in the project (managed packages, changes made directly in the org). Deploying it to an org where one of them
+is missing fails: use `--scope project`, or `sf df org align`.
 
 Translations need no such command: `sf project retrieve start -m "Translations:*"` and
 `-m "CustomObjectTranslation:Account-fr"` already return complete files, untranslated entries included.
+
+## Move profile accesses to permission sets: `sf df profile to-permset`
+
+Salesforce recommends keeping profiles minimal and granting accesses with permission sets. `sf df profile to-permset`
+writes, for each profile, a permission set with the accesses it grants (applications, classes, fields, objects,
+pages, record types, tabs, user permissions...), and revokes them on the profile. The profile keeps its license,
+layout assignments, default application and record types, login hours and IP ranges. Nothing is sent to an org.
+
+```bash
+# Sales.profile-meta.xml -> permissionsets/Sales.permissionset-meta.xml, accesses revoked on the profile
+sf df profile to-permset --source-dir force-app/main/default/profiles/Sales.profile-meta.xml
+
+# Only write the permission sets: deploy and assign them first, then run again without --keep-profile
+sf df profile to-permset --source-dir force-app/main/default/profiles --keep-profile
+```
+
+A deployment never revokes an access the profile doesn't mention: the moved entries stay on the profile, set to
+`false`. Deploy the permission set and assign it to the users of the profile **before** deploying the profile.
+A standard profile keeps its object and user permissions, which Salesforce doesn't let change. Start from a complete
+profile (`sf df profile retrieve`): the permission set only holds the accesses found in the file.
+
+## Deploy to an org that lacks components: `sf df org align`
+
+A profile, a permission set or a translation is refused as a whole when one of its entries refers to a component the
+target org lacks: a managed package field, a class created in another sandbox, a label not deployed yet, a feature
+that is not enabled. `sf df org align` lists what the target org holds and rewrites the files without those entries.
+Components of the project are deployed with the files: references to them are kept. It replaces the `adapt` commands
+of sfdx-mdt-plugin.
+
+```bash
+# Show what would be removed, without changing any file
+sf df org align --target-org uat --dry-run
+
+# Align the files of a delta before deploying it
+sf df org align --target-org uat --source-dir delta
+```
+
+Aligned types: `Profile`, `PermissionSet`, `MutingPermissionSet`, `PermissionSetGroup`, `Translations` and
+`CustomObjectTranslation`. Standard objects, fields, tabs and applications are checked too: they depend on the
+features of the org. Details: [docs/align.md](docs/align.md).
 
 ## Merge metadata by key: `sf df git merge-driver`
 
@@ -226,12 +270,13 @@ sf df git delta -f origin/main -d delta --destructive-dir destructive
 
 | `sfdx mdt:profile:retrieve` | `sf df profile retrieve` |
 | --- | --- |
-| `-p, --sourcepath` | `-d, --source-dir` (`--sourcepath` still works, deprecated) |
-| `-d, --outputdir` | `-r, --output-dir` (`--outputdir` still works, deprecated) |
+| `-p, --sourcepath` | `-d, --source-dir` (`--sourcepath` still accepted) |
+| `-d, --outputdir` | `-r, --output-dir` (`--outputdir` still accepted) |
 | `-u, --targetusername` | `-o, --target-org` |
 | Profile missing from the org: its file was overwritten with an empty profile | The file is left untouched and the command exits with 1 |
 | Profile name cut at the first dot (`Sales v1.2` read as `Sales v1`) | Full name, as `sf project retrieve` names it |
-| Every file of the folder read as a profile | Only profiles are read |
+| Every file of the folder read as a profile | Only profiles are read, other files are ignored |
+| Every entry the org returns | Granted accesses and the entries already in the file (`--entries all` for every entry) |
 | Errors logged, exit code 0 | Status per profile, exit code 1 on any failure |
 
 `sfdx mdt:translations:retrieve` has no replacement: it was a plain retrieve of the source files, which
@@ -260,6 +305,8 @@ Documentation:
 - [Architecture](docs/git-delta-architecture.md)
 - [Metadata strategies](docs/git-delta-metadata-strategies.md)
 - [Profile retrieve](docs/profile-retrieve.md)
+- [Profile to permission set](docs/profile-to-permset.md)
+- [Org align](docs/align.md)
 - [Merge driver](docs/merge-driver.md)
 - [Deploy](docs/deploy.md)
 - [Roadmap](docs/roadmap.md)
@@ -273,8 +320,10 @@ Documentation:
 * [`sf df git merge-driver install`](#sf-df-git-merge-driver-install)
 * [`sf df git merge-driver run`](#sf-df-git-merge-driver-run)
 * [`sf df git merge-driver uninstall`](#sf-df-git-merge-driver-uninstall)
+* [`sf df org align`](#sf-df-org-align)
 * [`sf df org map`](#sf-df-org-map)
 * [`sf df profile retrieve`](#sf-df-profile-retrieve)
+* [`sf df profile to-permset`](#sf-df-profile-to-permset)
 
 ## `sf df deploy`
 
@@ -546,6 +595,66 @@ EXAMPLES
 
 _See code: [src/commands/df/git/merge-driver/uninstall.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/merge-driver/uninstall.ts)_
 
+## `sf df org align`
+
+Remove from the local files the references to components the target org lacks, so that they deploy.
+
+```
+USAGE
+  $ sf df org align -o <value> [--json] [--flags-dir <value>] [-a <value>] [-d <value>...] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>    API version of the calls that list the components of the org.
+  -d, --source-dir=<value>...  File or directory to align.
+  -o, --target-org=<value>     (required) Org the files will be deployed to.
+      --dry-run                Show what would be removed without changing any file.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Remove from the local files the references to components the target org lacks, so that they deploy.
+
+  A profile, a permission set or a translation fails to deploy as a whole when one of its entries refers to a component
+  the target org doesn't have: a field of a managed package, a class created in another sandbox, a label not deployed
+  yet. This command lists the components of the target org and rewrites the files without those entries. Everything else
+  in the files is kept as is.
+
+  A component of the project's package directories is deployed with the files: a reference to it is kept, even when the
+  org doesn't have it yet. Standard objects, fields, tabs and applications are always kept. When the org can't list a
+  type, its references are kept and a warning says so.
+
+  Aligned types: Profile, PermissionSet, MutingPermissionSet and PermissionSetGroup (field, object, class, page, flow,
+  application, tab, record type, layout, custom permission and external data source accesses, user permissions,
+  permission sets of a group), Translations (applications, labels, tabs, flows, report types) and
+  CustomObjectTranslation (field sets, layouts, record types, validation rules, field translations). A field translation
+  file whose field is missing is deleted. An object translation whose object is missing is left as is, with a warning.
+
+  Run with --dry-run first to see what would be removed.
+
+EXAMPLES
+  Show what would be removed from the project's files before deploying to the org "uat":
+
+    $ sf df org align --target-org uat --dry-run
+
+  Align the files of a delta before deploying it:
+
+    $ sf df org align --target-org uat --source-dir delta
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  API version of the calls that list the components of the org.
+
+    Override the api version used for api requests made by this command
+
+  -d, --source-dir=<value>...  File or directory to align.
+
+    Defaults to the project's package directories. Can be specified multiple times. Typically the output of sf df git
+    delta.
+```
+
+_See code: [src/commands/df/org/align.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/org/align.ts)_
+
 ## `sf df org map`
 
 Map an org to its branch for sf df deploy, or show the mapping.
@@ -604,14 +713,22 @@ Retrieve complete profiles, with every access they grant.
 
 ```
 USAGE
-  $ sf df profile retrieve -o <value> -d <value> [--json] [--flags-dir <value>] [--api-version <value>] [-r <value>]
+  $ sf df profile retrieve -o <value> [--json] [--flags-dir <value>] [-a <value>] [-d <value>... | -x <value> | -m
+    <value>...] [-r <value>] [--entries active|all] [--scope org|project]
 
 FLAGS
-  -d, --source-dir=<value>   (required) Profile file, or folder containing profiles, to retrieve.
-  -o, --target-org=<value>   (required) Username or alias of the target org. Not required if the `target-org`
-                             configuration variable is already set.
-  -r, --output-dir=<value>   Directory where the retrieved profiles are written.
-      --api-version=<value>  Override the api version used for api requests made by this command
+  -a, --api-version=<value>    API version of the readMetadata calls. Defaults to the sourceApiVersion of
+                               sfdx-project.json.
+  -d, --source-dir=<value>...  Profile file, or folder containing profiles, to retrieve.
+  -m, --metadata=<value>...    Profiles to retrieve, as Profile or Profile:Name.
+  -o, --target-org=<value>     (required) Username or alias of the target org. Not required if the `target-org`
+                               configuration variable is already set.
+  -r, --output-dir=<value>     Directory where the retrieved profiles are written, in a profiles subdirectory.
+  -x, --manifest=<value>       File path for the manifest (package.xml) that lists the profiles to retrieve.
+      --entries=<option>       [default: active] Profile entries to keep: active (default) or all.
+                               <options: active|all>
+      --scope=<option>         [default: org] Components the profile accesses refer to: org (default) or project.
+                               <options: org|project>
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -623,10 +740,19 @@ DESCRIPTION
   `sf project retrieve start` only returns the parts of a profile that relate to the components retrieved with it:
   retrieving a profile alone gives its user permissions, but not its field, object, class, page, tab, application or
   record type accesses. This command reads each profile with the Metadata API readMetadata call, which returns the whole
-  profile, and writes it in the same layout as `sf project retrieve start`.
+  profile, and writes it in the same layout as `sf project retrieve start`. Retrieve the other metadata types with `sf
+  project retrieve start`, without the profiles, or run this command after it: a native retrieve overwrites a complete
+  profile with a partial one.
 
-  Profiles are found in the source file or folder given by --source-dir and are overwritten in place, unless
-  --output-dir is set. A profile that doesn't exist in the org is reported and its file is left untouched.
+  The profile is written so that it deploys: the org returns settings for standard tabs it refuses at deployment, and
+  may hold two layout assignments for one record type. Both are left out, with a warning. --entries and --scope choose
+  which accesses are kept.
+
+  The profiles are chosen with the flags of `sf project retrieve start`: --source-dir, --metadata or --manifest, which
+  are mutually exclusive. Without any of them, every profile of the project's package directories is retrieved.
+  Wildcards in --metadata and --manifest are resolved against the org. A profile already in the project is overwritten
+  in place, a new one is written to the default package directory, unless --output-dir is set. A profile that doesn't
+  exist in the org is reported and no file is written for it.
 
   The API version is, in order: --api-version, the sourceApiVersion of sfdx-project.json, the org's version. The content
   of a profile depends on it.
@@ -636,23 +762,140 @@ DESCRIPTION
 EXAMPLES
   Retrieve every profile of the project from the default org, overwriting the files:
 
+    $ sf df profile retrieve
+
+  Retrieve the profiles of a folder:
+
     $ sf df profile retrieve --source-dir force-app/main/default/profiles
 
-  Retrieve one profile from a given org into another folder:
+  Retrieve one profile, and the profiles whose name starts with Sales, from a given org:
 
-    $ sf df profile retrieve --source-dir "force-app/main/default/profiles/Admin.profile-meta.xml" --target-org ^
-      my-sandbox --output-dir retrieved
+    $ sf df profile retrieve --metadata Profile:Admin --metadata "Profile:Sales*" --target-org my-sandbox
+
+  Retrieve the Admin profile with only the accesses to the components of the project:
+
+    $ sf df profile retrieve --metadata Profile:Admin --scope project
+
+  Retrieve the profiles listed in a manifest into another folder:
+
+    $ sf df profile retrieve --manifest manifest/package.xml --output-dir retrieved
 
 FLAG DESCRIPTIONS
-  -d, --source-dir=<value>  Profile file, or folder containing profiles, to retrieve.
+  -a, --api-version=<value>
 
-    Every profile found in this file or folder is retrieved, and only those. Other files are ignored. Replaces
-    --sourcepath of sfdx mdt:profile:retrieve.
+    API version of the readMetadata calls. Defaults to the sourceApiVersion of sfdx-project.json.
 
-  -r, --output-dir=<value>  Directory where the retrieved profiles are written.
+    Override the api version used for api requests made by this command
 
-    When omitted, the profiles found in --source-dir are overwritten. Replaces --outputdir of sfdx mdt:profile:retrieve.
+  -d, --source-dir=<value>...  Profile file, or folder containing profiles, to retrieve.
+
+    Every profile found in these files or folders is retrieved, and only those. Other files are ignored. Can be
+    specified multiple times. Replaces --sourcepath of sfdx mdt:profile:retrieve.
+
+  -m, --metadata=<value>...  Profiles to retrieve, as Profile or Profile:Name.
+
+    Profile alone retrieves every profile of the org. A name can hold the * wildcard, for example "Profile:Sales*",
+    matched against the profiles of the org. Can be specified multiple times. Only the Profile type is accepted.
+
+  -r, --output-dir=<value>  Directory where the retrieved profiles are written, in a profiles subdirectory.
+
+    Profiles are written to <output-dir>/profiles, as `sf project retrieve start --output-dir` writes them. When
+    omitted, the profiles of the project are overwritten. Replaces --outputdir of sfdx mdt:profile:retrieve.
+
+  -x, --manifest=<value>  File path for the manifest (package.xml) that lists the profiles to retrieve.
+
+    Only the Profile members are retrieved, the other types of the manifest are ignored. A * member retrieves every
+    profile of the org.
+
+  --entries=active|all  Profile entries to keep: active (default) or all.
+
+    active leaves out the entries that grant nothing (a field neither readable nor editable, a class not enabled...),
+    except those already in the project's file, which keep the org's value. A deployment never revokes an access the
+    profile doesn't mention: an access revoked in the org must stay in the file, set to false. all keeps every entry the
+    org returns. Tab visibilities, layout assignments and the other settings are always kept.
+
+  --scope=org|project  Components the profile accesses refer to: org (default) or project.
+
+    org keeps the accesses to every component of the org. project only keeps the accesses to the components of the
+    project's package directories and to standard components (Account, Account.Name, standard tabs and applications):
+    the profile no longer mentions the fields of managed packages or the components created in the org but not
+    retrieved, so that it deploys to an org that lacks them. Retrieve the profile again after adding a component to the
+    project.
 ```
 
 _See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/profile/retrieve.ts)_
+
+## `sf df profile to-permset`
+
+Move the accesses of profiles to permission sets.
+
+```
+USAGE
+  $ sf df profile to-permset -d <value>... [--json] [--flags-dir <value>] [-n <value>] [-l <value>] [-r <value>]
+    [--keep-profile]
+
+FLAGS
+  -d, --source-dir=<value>...  (required) Profile file, or folder containing profiles, to convert.
+  -l, --label=<value>          Label of the permission set. Defaults to the profile name. Only when a single profile is
+                               converted.
+  -n, --name=<value>           API name of the permission set. Defaults to the profile name, letters and digits only.
+  -r, --output-dir=<value>     Directory where the permission sets are written. Defaults to the permissionsets folder
+                               next to the profiles folder.
+      --keep-profile           Leave the profiles as they are: only write the permission sets.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Move the accesses of profiles to permission sets.
+
+  For each profile, writes a permission set that grants the same accesses: applications, Apex classes, custom metadata
+  types, custom permissions, custom settings, external data sources, fields, flows, objects, Visualforce pages, record
+  types, tabs and user permissions. Entries that grant nothing are not copied. The profile keeps what a permission set
+  can't hold: its license, layout assignments, default application and record types, login hours, IP ranges and other
+  settings.
+
+  The moved accesses are then revoked on the profile: each entry is kept, set to false (Hidden for a tab), because a
+  deployment never revokes an access the profile doesn't mention. The default application and the default record types
+  stay visible on the profile. A standard profile keeps its object and user permissions, which Salesforce doesn't let
+  change.
+
+  Nothing is sent to an org. Deploy in two steps, so that users keep their accesses: first the permission set, then
+  assign it to the users of the profile, then deploy the profile.
+
+  Works best on a complete profile, as written by sf df profile retrieve: the permission set only holds the accesses
+  found in the file.
+
+EXAMPLES
+  Move the accesses of the Sales profile to a Sales permission set, and revoke them on the profile:
+
+    $ sf df profile to-permset --source-dir force-app/main/default/profiles/Sales.profile-meta.xml
+
+  Choose the name and label of the permission set:
+
+    $ sf df profile to-permset --source-dir force-app/main/default/profiles/Sales.profile-meta.xml --name ^
+      Sales_Access --label "Sales access"
+
+  Only write the permission sets of every profile of a folder, leaving the profiles as they are:
+
+    $ sf df profile to-permset --source-dir force-app/main/default/profiles --keep-profile
+
+FLAG DESCRIPTIONS
+  -d, --source-dir=<value>...  Profile file, or folder containing profiles, to convert.
+
+    Every profile found in these files or folders is converted. Can be specified multiple times.
+
+  -n, --name=<value>  API name of the permission set. Defaults to the profile name, letters and digits only.
+
+    Only when a single profile is converted.
+
+  --keep-profile  Leave the profiles as they are: only write the permission sets.
+
+    The first step of a migration: deploy the permission sets and assign them, then run the command again without
+    --keep-profile to revoke the accesses on the profiles. The permission set written by the first run is kept when the
+    profile hasn't changed since.
+```
+
+_See code: [src/commands/df/profile/to-permset.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/profile/to-permset.ts)_
 <!-- commandsstop -->

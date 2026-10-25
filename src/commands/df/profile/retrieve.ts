@@ -3,6 +3,13 @@ import path from 'node:path';
 import { type Connection, Messages, SfProject } from '@salesforce/core';
 import { Flags, SfCommand } from '@salesforce/sf-plugins-core';
 
+import { listStandardTabs } from '../../../retrieve/profile-deployable.js';
+import {
+  projectComponentKeys,
+  type ProfileEntries,
+  type ProfileFilterOptions,
+  type ProfileScope,
+} from '../../../retrieve/profile-filter.js';
 import {
   findProfileSources,
   retrieveProfiles,
@@ -88,6 +95,26 @@ const findSources = async (
   return nonEmpty(selected, flags.metadata?.join(', ') ?? flags.manifest!);
 };
 
+// --scope project needs the project's package directories: the profiles are filtered on their components.
+const profileFilterOf = (
+  entries: ProfileEntries,
+  scope: ProfileScope,
+  project: SfProject | undefined
+): ProfileFilterOptions => {
+  if (scope !== 'project') {
+    return { entries };
+  }
+
+  if (!project) {
+    throw messages.createError('error.scopeNeedsProject');
+  }
+
+  return {
+    entries,
+    projectComponents: projectComponentKeys(project.getPackageDirectories().map((directory) => directory.fullPath)),
+  };
+};
+
 export default class ProfileRetrieve extends SfCommand<ProfileRetrieveResult> {
   public static readonly summary = messages.getMessage('summary');
   public static readonly description = messages.getMessage('description');
@@ -132,6 +159,18 @@ export default class ProfileRetrieve extends SfCommand<ProfileRetrieveResult> {
       aliases: ['outputdir'],
       deprecateAliases: true,
     }),
+    entries: Flags.string({
+      options: ['active', 'all'],
+      default: 'active',
+      summary: messages.getMessage('flags.entries.summary'),
+      description: messages.getMessage('flags.entries.description'),
+    }),
+    scope: Flags.string({
+      options: ['org', 'project'],
+      default: 'org',
+      summary: messages.getMessage('flags.scope.summary'),
+      description: messages.getMessage('flags.scope.description'),
+    }),
   };
 
   public async run(): Promise<ProfileRetrieveResult> {
@@ -139,13 +178,26 @@ export default class ProfileRetrieve extends SfCommand<ProfileRetrieveResult> {
     const project = await resolveProject();
     const connection = flags['target-org'].getConnection(flags['api-version'] ?? (await projectApiVersion(project)));
     const sources = await findSources(flags, project, connection);
+    const filter = profileFilterOf(flags.entries as ProfileEntries, flags.scope as ProfileScope, project);
 
     this.spinner.start(messages.getMessage('spinner.start', [connection.getApiVersion()]));
     this.spinner.status = `0/${sources.length}`;
+    // Without the list, settings of tabs the org refuses are kept: they are never removed on a guess.
+    const standardTabs = await listStandardTabs(connection).then(
+      (names) => new Set(names),
+      (error: unknown) => {
+        this.warn(
+          messages.getMessage('warning.standardTabs', [error instanceof Error ? error.message : String(error)])
+        );
+        return undefined;
+      }
+    );
     const result = await retrieveProfiles({
       connection,
       sources,
       outputDir: flags['output-dir'],
+      filter,
+      standardTabs,
       onProgress: (_profile, done, total) => {
         this.spinner.status = `${done}/${total}`;
       },
@@ -160,6 +212,20 @@ export default class ProfileRetrieve extends SfCommand<ProfileRetrieveResult> {
         filePath,
       })),
     });
+
+    for (const { fullName, leftOut } of result.profiles) {
+      const tabs = leftOut?.filter((entry) => entry.section === 'tabVisibilities') ?? [];
+      const assignments = leftOut?.filter((entry) => entry.section === 'layoutAssignments') ?? [];
+      if (tabs.length > 0) {
+        this.warn(messages.getMessage('warning.tabs', [fullName, tabs.length]));
+      }
+
+      if (assignments.length > 0) {
+        this.warn(
+          messages.getMessage('warning.layoutAssignments', [fullName, assignments.map(({ name }) => name).join(', ')])
+        );
+      }
+    }
 
     for (const profile of failed) {
       this.warn(

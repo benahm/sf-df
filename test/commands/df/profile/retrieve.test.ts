@@ -28,6 +28,9 @@ describe('df profile retrieve', () => {
   let requestedUrls: string[];
   let readNames: string[];
   let listCalls: number;
+  // Body of each profile in the org, after its fullName.
+  let orgProfiles: Record<string, string>;
+  let standardTabs: string[] | Error;
 
   const writeProfile = async (name: string): Promise<string> => {
     const filePath = path.join(profilesDir, `${name}.profile-meta.xml`);
@@ -57,9 +60,19 @@ describe('df profile retrieve', () => {
     requestedUrls = [];
     readNames = [];
     listCalls = 0;
+    orgProfiles = Object.fromEntries(ORG_PROFILES.map((name) => [name, '<custom>false</custom>']));
+    standardTabs = ['standard-Account'];
     $$.fakeConnectionRequest = async (request) => {
       const { url, body } = request as { url: string; body: string };
       requestedUrls.push(url);
+      if (url.includes('/tooling/query')) {
+        if (standardTabs instanceof Error) {
+          throw standardTabs;
+        }
+
+        return { done: true, totalSize: standardTabs.length, records: standardTabs.map((Name) => ({ Name })) };
+      }
+
       if (body.includes('listMetadata')) {
         listCalls += 1;
         return listMetadataResponse(ORG_PROFILES);
@@ -67,8 +80,8 @@ describe('df profile retrieve', () => {
 
       const name = /<m:fullNames>([^<]*)<\/m:fullNames>/.exec(body)![1];
       readNames.push(name);
-      return ORG_PROFILES.includes(name)
-        ? readMetadataResponse(`<fullName>${name}</fullName><custom>false</custom>`)
+      return name in orgProfiles
+        ? readMetadataResponse(`<fullName>${name}</fullName>${orgProfiles[name]}`)
         : readMetadataResponse(undefined);
     };
   });
@@ -93,6 +106,7 @@ describe('df profile retrieve', () => {
     ]);
 
     expect(result.profiles).to.deep.equal([{ fullName: 'Admin', filePath: adminPath, status: 'retrieved' }]);
+    expect(sfCommandStubs.warn.called).to.equal(false);
     expect(await readFile(adminPath, 'utf8')).to.contain('    <custom>false</custom>\n');
     expect(requestedUrls.filter((url) => url.includes('/services/Soap/m/'))).to.have.length(1);
     expect(requestedUrls.find((url) => url.includes('/services/Soap/m/'))).to.match(/\/services\/Soap\/m\/62\.0$/);
@@ -231,5 +245,102 @@ describe('df profile retrieve', () => {
     } catch (error) {
       expect((error as Error).message).to.contain('No profile found in Profile:Nobody*');
     }
+  });
+  describe('a profile that deploys', () => {
+    const tab = (name: string): string =>
+      `<tabVisibilities><tab>${name}</tab><visibility>DefaultOn</visibility></tabVisibilities>`;
+    const assignment = (layout: string, recordType: string): string =>
+      `<layoutAssignments><layout>${layout}</layout><recordType>${recordType}</recordType></layoutAssignments>`;
+
+    it('leaves out the standard tabs the org refuses and the layouts assigned twice, with a warning', async () => {
+      const adminPath = await writeProfile('Admin');
+      orgProfiles.Admin = [
+        '<custom>false</custom>',
+        assignment('Case-Claims Layout', 'Case.Claims'),
+        assignment('CaseClose-Closing Layout', 'Case.Claims'),
+        assignment('PersonAccount-Client Layout', 'PersonAccount.Client'),
+        assignment('PersonAccount-Retail Layout', 'PersonAccount.Client'),
+        tab('standard-Account'),
+        tab('standard-AccountAccountRelation'),
+        tab('Invoice__c'),
+      ].join('');
+
+      const result = await ProfileRetrieve.run(['-d', profilesDir, '-o', testOrg.username]);
+
+      expect(result.profiles[0].leftOut).to.deep.equal([
+        { section: 'layoutAssignments', name: 'PersonAccount.Client' },
+        { section: 'tabVisibilities', name: 'standard-AccountAccountRelation' },
+      ]);
+      const written = await readFile(adminPath, 'utf8');
+      expect(written).to.contain('Case-Claims Layout').and.contain('CaseClose-Closing Layout');
+      expect(written).to.contain('standard-Account<').and.contain('Invoice__c');
+      expect(written).not.to.contain('PersonAccount').and.not.to.contain('AccountAccountRelation');
+      const warnings = sfCommandStubs.warn.getCalls().map((call) => call.args[0] as string);
+      expect(warnings).to.have.length(2);
+      expect(warnings[0]).to.contain('1 settings of standard tabs');
+      expect(warnings[1]).to.contain('PersonAccount.Client');
+      expect(process.exitCode).to.equal(undefined);
+    });
+
+    it("keeps every tab setting when the org can't list its standard tabs", async () => {
+      const adminPath = await writeProfile('Admin');
+      orgProfiles.Admin = `<custom>false</custom>${tab('standard-AccountAccountRelation')}`;
+      standardTabs = new Error('INSUFFICIENT_ACCESS');
+
+      await ProfileRetrieve.run(['-d', profilesDir, '-o', testOrg.username]);
+
+      expect(await readFile(adminPath, 'utf8')).to.contain('standard-AccountAccountRelation');
+      expect(sfCommandStubs.warn.firstCall.args[0]).to.contain('INSUFFICIENT_ACCESS');
+    });
+  });
+
+  describe('--entries and --scope', () => {
+    const classAccess = (name: string, enabled: boolean): string =>
+      `<classAccesses><apexClass>${name}</apexClass><enabled>${enabled}</enabled></classAccesses>`;
+
+    beforeEach(() => {
+      orgProfiles.Admin = [
+        classAccess('InProject', true),
+        classAccess('Disabled', false),
+        classAccess('OrgOnly', true),
+        '<custom>false</custom>',
+      ].join('');
+    });
+
+    const apexClasses = async (filePath: string): Promise<string[]> =>
+      [...(await readFile(filePath, 'utf8')).matchAll(/<apexClass>([^<]*)<\/apexClass>/g)].map((match) => match[1]);
+
+    it('active by default: the entries granting nothing are left out', async () => {
+      const adminPath = await writeProfile('Admin');
+
+      await ProfileRetrieve.run(['-d', profilesDir, '-o', testOrg.username]);
+
+      expect(await apexClasses(adminPath)).to.deep.equal(['InProject', 'OrgOnly']);
+    });
+
+    it('--entries all keeps every entry', async () => {
+      const adminPath = await writeProfile('Admin');
+
+      await ProfileRetrieve.run(['-d', profilesDir, '-o', testOrg.username, '--entries', 'all']);
+
+      expect(await apexClasses(adminPath)).to.deep.equal(['InProject', 'Disabled', 'OrgOnly']);
+    });
+
+    it('--scope project keeps the accesses to the components of the project', async () => {
+      const adminPath = await writeProfile('Admin');
+      const classesDir = path.join(root, 'force-app', 'main', 'default', 'classes');
+      await mkdir(classesDir, { recursive: true });
+      await writeFile(path.join(classesDir, 'InProject.cls'), 'public class InProject {}', 'utf8');
+      await writeFile(
+        path.join(classesDir, 'InProject.cls-meta.xml'),
+        '<?xml version="1.0" encoding="UTF-8"?>\n<ApexClass xmlns="http://soap.sforce.com/2006/04/metadata">\n' +
+          '    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>\n',
+        'utf8'
+      );
+
+      await ProfileRetrieve.run(['-d', profilesDir, '-o', testOrg.username, '--scope', 'project']);
+
+      expect(await apexClasses(adminPath)).to.deep.equal(['InProject']);
+    });
   });
 });

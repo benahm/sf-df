@@ -87,6 +87,25 @@
     },
     {
         "alias": [],
+        "command": "df:org:align",
+        "flagAliases": [],
+        "flagChars": [
+            "a",
+            "d",
+            "o"
+        ],
+        "flags": [
+            "api-version",
+            "dry-run",
+            "flags-dir",
+            "json",
+            "source-dir",
+            "target-org"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
         "command": "df:org:map",
         "flagAliases": [],
         "flagChars": [
@@ -119,13 +138,36 @@
         ],
         "flags": [
             "api-version",
+            "entries",
             "flags-dir",
             "json",
             "manifest",
             "metadata",
             "output-dir",
+            "scope",
             "source-dir",
             "target-org"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
+        "command": "df:profile:to-permset",
+        "flagAliases": [],
+        "flagChars": [
+            "d",
+            "l",
+            "n",
+            "r"
+        ],
+        "flags": [
+            "flags-dir",
+            "json",
+            "keep-profile",
+            "label",
+            "name",
+            "output-dir",
+            "source-dir"
         ],
         "plugin": "sf-df"
     }

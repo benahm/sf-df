@@ -32,7 +32,9 @@ Between hand-written CI scripts around a delta tool and complete DevOps framewor
 | [`sf df org map`](./commands/df-org-map.md) | Map each org to its branch, once, in `sfdx-project.json`. |
 | [`sf df git delta`](./commands/df-git-delta.md) | Build an incremental deployment from a git diff. Replaces `sfdx mdt:git:delta`. |
 | [`sf df git merge-driver install`](./commands/df-git-merge-driver-install.md) | Merge profiles, permission sets, labels and translations item by item instead of line by line. |
-| [`sf df profile retrieve`](./commands/df-profile-retrieve.md) | Retrieve complete profiles. Replaces `sfdx mdt:profile:retrieve`. |
+| [`sf df profile retrieve`](./commands/df-profile-retrieve.md) | Retrieve complete profiles, ready to deploy. Replaces `sfdx mdt:profile:retrieve`. |
+| [`sf df profile to-permset`](./commands/df-profile-to-permset.md) | Move the accesses of a profile to a permission set and revoke them on the profile. |
+| [`sf df org align`](./commands/df-org-align.md) | Remove from profiles, permission sets and translations the references to components the target org lacks. Replaces the `adapt` commands of sfdx-mdt-plugin. |
 
 ## Principles
 

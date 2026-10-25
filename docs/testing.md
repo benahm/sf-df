@@ -181,6 +181,13 @@ The behaviours it uncovered are pinned by fast unit tests in `test/delta/sandbox
 that file is found, unchanged and in the same order, in the complete profile written by `sf df profile retrieve`.
 Takes about 2 minutes. See [profile-retrieve.md](profile-retrieve.md).
 
+### Profile to permission set on an org
+
+`test/e2e-org/profile-to-permset.org.e2e.test.ts` deploys a custom profile, an object, a field, a tab and a class (all
+`SfDfQa*`), converts the profile with `sf df profile to-permset`, deploys the permission set then the profile, and
+checks that both together grant exactly what the profile granted alone. Everything is deleted at the end. See
+[profile-to-permset.md](profile-to-permset.md).
+
 Useful environment variables:
 
 1. `RUN_E2E_ORG=true`: enable org test execution.

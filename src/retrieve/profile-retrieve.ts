@@ -1,10 +1,12 @@
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { Connection } from '@salesforce/core';
 import { ComponentSet } from '@salesforce/source-deploy-retrieve';
 
 import { formatMetadataFile, readMetadataRaw, type ReadMetadataOptions } from './metadata-read.js';
+import { makeDeployable, type LeftOutEntry } from './profile-deployable.js';
+import { filterProfile, type ProfileFilterOptions } from './profile-filter.js';
 
 export type ProfileRetrieveStatus = 'retrieved' | 'notFound' | 'failed';
 
@@ -13,6 +15,8 @@ export type RetrievedProfile = {
   filePath: string;
   status: ProfileRetrieveStatus;
   error?: string;
+  // Entries the org returned but refuses to deploy, left out of the file.
+  leftOut?: LeftOutEntry[];
 };
 
 export type ProfileRetrieveResult = {
@@ -26,6 +30,10 @@ export type ProfileRetrieveOptions = ReadMetadataOptions & {
   sourcePath?: string | string[];
   // Profiles are written to <outputDir>/profiles, where `sf project retrieve start --output-dir` writes them.
   outputDir?: string;
+  // Entries kept from the complete profile. When omitted, every entry the org returns.
+  filter?: ProfileFilterOptions;
+  // Standard tabs of the org: settings for the other standard tabs are left out. Undefined: they are kept.
+  standardTabs?: Set<string>;
   concurrency?: number;
   onProgress?: (profile: RetrievedProfile, done: number, total: number) => void;
 };
@@ -71,9 +79,24 @@ const retrieveOne = async (source: ProfileSource, options: ProfileRetrieveOption
       return { fullName: source.fullName, filePath: source.filePath, status: 'notFound' };
     }
 
+    const deployable = makeDeployable(formatMetadataFile('Profile', record.body), {
+      standardTabs: options.standardTabs,
+    });
+    let content = deployable.xml;
+    if (options.filter) {
+      // The project's file, even with --output-dir: its entries are the ones the project already tracks.
+      const localXml = await readFile(source.filePath, 'utf8').catch(() => undefined);
+      content = filterProfile(content, options.filter, localXml);
+    }
+
     await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFileAtomic(filePath, formatMetadataFile('Profile', record.body));
-    return { fullName: source.fullName, filePath, status: 'retrieved' };
+    await writeFileAtomic(filePath, content);
+    return {
+      fullName: source.fullName,
+      filePath,
+      status: 'retrieved',
+      ...(deployable.leftOut.length > 0 ? { leftOut: deployable.leftOut } : {}),
+    };
   } catch (error) {
     return {
       fullName: source.fullName,

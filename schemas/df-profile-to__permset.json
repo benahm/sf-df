@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/ProfileToPermsetResult",
+  "definitions": {
+    "ProfileToPermsetResult": {
+      "type": "object",
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConvertedProfile"
+          }
+        }
+      },
+      "required": [
+        "profiles"
+      ],
+      "additionalProperties": false
+    },
+    "ConvertedProfile": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "profilePath": {
+          "type": "string"
+        },
+        "profileChanged": {
+          "type": "boolean"
+        },
+        "standardProfile": {
+          "type": "boolean"
+        },
+        "permissionSet": {
+          "type": "string"
+        },
+        "permissionSetPath": {
+          "type": "string"
+        },
+        "moved": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      },
+      "required": [
+        "profile",
+        "profilePath",
+        "profileChanged",
+        "standardProfile",
+        "permissionSet",
+        "permissionSetPath",
+        "moved"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

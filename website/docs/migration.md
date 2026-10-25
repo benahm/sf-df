@@ -28,12 +28,13 @@ sf df git delta -f origin/main -d delta --destructive-dir destructive
 
 | `sfdx mdt:profile:retrieve` | `sf df profile retrieve` |
 | --- | --- |
-| `-p, --sourcepath` | `-d, --source-dir` (`--sourcepath` still works, deprecated) |
-| `-d, --outputdir` | `-r, --output-dir` (`--outputdir` still works, deprecated) |
+| `-p, --sourcepath` | `-d, --source-dir` (`--sourcepath` still accepted) |
+| `-d, --outputdir` | `-r, --output-dir` (`--outputdir` still accepted) |
 | `-u, --targetusername` | `-o, --target-org` |
 | Profile missing from the org: its file was overwritten with an empty profile | The file is left untouched and the command exits with 1 |
 | Profile name cut at the first dot (`Sales v1.2` read as `Sales v1`) | Full name, as `sf project retrieve` names it |
-| Every file of the folder read as a profile | Only profiles are read |
+| Every file of the folder read as a profile | Only profiles are read, other files are ignored |
+| Every entry the org returns | Granted accesses and the entries already in the file (`--entries all` for every entry) |
 | Errors logged, exit code 0 | Status per profile, exit code 1 on any failure |
 
 ## `sfdx mdt:translations:retrieve`

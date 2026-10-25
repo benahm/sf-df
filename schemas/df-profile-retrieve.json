@@ -31,6 +31,12 @@
         },
         "error": {
           "type": "string"
+        },
+        "leftOut": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LeftOutEntry"
+          }
         }
       },
       "required": [
@@ -47,6 +53,26 @@
         "notFound",
         "failed"
       ]
+    },
+    "LeftOutEntry": {
+      "type": "object",
+      "properties": {
+        "section": {
+          "type": "string",
+          "enum": [
+            "tabVisibilities",
+            "layoutAssignments"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "section",
+        "name"
+      ],
+      "additionalProperties": false
     }
   }
 }

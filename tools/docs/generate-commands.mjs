@@ -19,6 +19,8 @@ const ORDER = [
   'df:git:merge-driver:run',
   'df:git:merge-driver:uninstall',
   'df:profile:retrieve',
+  'df:profile:to-permset',
+  'df:org:align',
 ];
 const GLOBAL_FLAGS = new Set(['json', 'flags-dir']);
 

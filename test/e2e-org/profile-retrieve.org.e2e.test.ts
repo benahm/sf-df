@@ -61,7 +61,8 @@ describe.skipIf(!enabled)('sf df profile retrieve on a real org', () => {
     const outputDir = path.join(work, 'out');
     const result = await retrieveProfiles({ connection, sourcePath: nativePath, outputDir });
 
-    expect(result.profiles).toEqual([
+    // `leftOut`: the layouts the org assigns twice to one record type, refused at deployment.
+    expect(result.profiles).toMatchObject([
       { fullName: profileName, filePath: path.join(outputDir, 'profiles', path.basename(nativePath)), status: 'retrieved' },
     ]);
     const complete = readFileSync(result.profiles[0].filePath, 'utf8');

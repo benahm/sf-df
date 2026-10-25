@@ -68,15 +68,27 @@ const assertResponse = (response: string, call: string): void => {
 
 const LIST_RESULT = /<result>([\s\S]*?)<\/result>/g;
 const LISTED_FULL_NAME = /<fullName>([^<]*)<\/fullName>/;
+const LISTED_NAMESPACE = /<namespacePrefix>([^<]+)<\/namespacePrefix>/;
+
+export type ListedComponent = { fullName: string; namespacePrefix?: string };
+
+// Components of a listMetadata response, as the org returns them.
+export const parseListMetadataEntries = (response: string): ListedComponent[] => {
+  assertResponse(response, 'listMetadata');
+  return [...response.matchAll(LIST_RESULT)].flatMap((match): ListedComponent[] => {
+    const fullName = LISTED_FULL_NAME.exec(match[1])?.[1];
+    if (fullName === undefined) {
+      return [];
+    }
+
+    const namespacePrefix = LISTED_NAMESPACE.exec(match[1])?.[1];
+    return [{ fullName: decodeText(fullName), ...(namespacePrefix ? { namespacePrefix: decodeText(namespacePrefix) } : {}) }];
+  });
+};
 
 // Full names of a listMetadata response, as the org returns them.
-export const parseListMetadataResponse = (response: string): string[] => {
-  assertResponse(response, 'listMetadata');
-  return [...response.matchAll(LIST_RESULT)]
-    .map((match) => LISTED_FULL_NAME.exec(match[1])?.[1])
-    .filter((fullName): fullName is string => fullName !== undefined)
-    .map(decodeText);
-};
+export const parseListMetadataResponse = (response: string): string[] =>
+  parseListMetadataEntries(response).map((entry) => entry.fullName);
 
 export const parseReadMetadataResponse = (response: string): Array<ReadMetadataRecord | undefined> => {
   assertResponse(response, 'readMetadata');
@@ -217,6 +229,14 @@ export const listMetadataNames = async (
   options: ReadMetadataOptions = {}
 ): Promise<string[]> =>
   callMetadataSoap(connection, (token) => buildListMetadataEnvelope(token, type), parseListMetadataResponse, options);
+
+// Same call, with the namespace of each component.
+export const listMetadataEntries = async (
+  connection: Connection,
+  type: string,
+  options: ReadMetadataOptions = {}
+): Promise<ListedComponent[]> =>
+  callMetadataSoap(connection, (token) => buildListMetadataEnvelope(token, type), parseListMetadataEntries, options);
 
 const callMetadataSoap = async <T>(
   connection: Connection,
