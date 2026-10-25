@@ -428,7 +428,7 @@ FLAG DESCRIPTIONS
     left unchanged.
 ```
 
-_See code: [src/commands/df/deploy.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/deploy.ts)_
+_See code: [src/commands/df/deploy.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/deploy.ts)_
 
 ## `sf df git delta`
 
@@ -508,7 +508,7 @@ FLAG DESCRIPTIONS
     be inside the deploy directory, or the other way round. Replaces --descructivedir of sfdx mdt:git:delta.
 ```
 
-_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/delta.ts)_
+_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/git/delta.ts)_
 
 ## `sf df git merge-driver install`
 
@@ -544,7 +544,7 @@ EXAMPLES
     $ sf df git merge-driver install
 ```
 
-_See code: [src/commands/df/git/merge-driver/install.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/merge-driver/install.ts)_
+_See code: [src/commands/df/git/merge-driver/install.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/git/merge-driver/install.ts)_
 
 ## `sf df git merge-driver run`
 
@@ -588,7 +588,7 @@ FLAG DESCRIPTIONS
     Receives the merged result.
 ```
 
-_See code: [src/commands/df/git/merge-driver/run.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/merge-driver/run.ts)_
+_See code: [src/commands/df/git/merge-driver/run.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/git/merge-driver/run.ts)_
 
 ## `sf df git merge-driver uninstall`
 
@@ -614,7 +614,7 @@ EXAMPLES
     $ sf df git merge-driver uninstall
 ```
 
-_See code: [src/commands/df/git/merge-driver/uninstall.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/git/merge-driver/uninstall.ts)_
+_See code: [src/commands/df/git/merge-driver/uninstall.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/git/merge-driver/uninstall.ts)_
 
 ## `sf df org align`
 
@@ -674,7 +674,7 @@ FLAG DESCRIPTIONS
     delta.
 ```
 
-_See code: [src/commands/df/org/align.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/org/align.ts)_
+_See code: [src/commands/df/org/align.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/org/align.ts)_
 
 ## `sf df org changes`
 
@@ -766,7 +766,7 @@ FLAG DESCRIPTIONS
     Without --since, the 20 latest changes are listed. With it, every change since the date, unless --limit is set.
 ```
 
-_See code: [src/commands/df/org/changes.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/org/changes.ts)_
+_See code: [src/commands/df/org/changes.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/org/changes.ts)_
 
 ## `sf df org map`
 
@@ -818,7 +818,7 @@ FLAG DESCRIPTIONS
     Adds the org to the mapping, or changes its branch. Fails when the branch is already mapped to another org.
 ```
 
-_See code: [src/commands/df/org/map.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/org/map.ts)_
+_See code: [src/commands/df/org/map.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/org/map.ts)_
 
 ## `sf df profile retrieve`
 
@@ -936,7 +936,7 @@ FLAG DESCRIPTIONS
     project.
 ```
 
-_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/profile/retrieve.ts)_
+_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/profile/retrieve.ts)_
 
 ## `sf df profile to-permset`
 
@@ -1010,5 +1010,5 @@ FLAG DESCRIPTIONS
     profile hasn't changed since.
 ```
 
-_See code: [src/commands/df/profile/to-permset.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/profile/to-permset.ts)_
+_See code: [src/commands/df/profile/to-permset.ts](https://github.com/benahm/sf-df/blob/v0.0.6-beta/src/commands/df/profile/to-permset.ts)_
 <!-- commandsstop -->
