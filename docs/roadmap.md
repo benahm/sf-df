@@ -160,6 +160,7 @@ Outils d'appoint, utiles seuls. Aucun n'est nécessaire pour livrer : c'est le r
 | `sf df git merge-driver install` | **Fait** : fusion par clé des XML conteneurs au lieu de ligne à ligne. Voir [merge-driver.md](merge-driver.md). |
 | `sf df test select --from <ref> --to <ref>` | Classes de test à lancer, déduites des classes Apex du delta. Même logique que la sélection de tests de `deploy`. |
 | `sf df org drift --target-org int` | Composants modifiés directement dans l'org par rapport à la branche. Option : les récupérer dans une branche dédiée. |
+| `sf df org changes --target-org int` | **Done**: the latest changes of an org, with date and author, written to a `package.xml` to retrieve them. See [org-changes.md](org-changes.md). Next: a column telling whether the component is in the project, a bridge towards `org drift`. |
 | `sf df profile retrieve` | **Done**: complete profiles that deploy, the other types left to `sf project retrieve start`. See [profile-retrieve.md](profile-retrieve.md). |
 | `sf df profile to-permset` | **Done**: moves the accesses of a profile to a permission set and revokes them on the profile. See [profile-to-permset.md](profile-to-permset.md). |
 | `sf df org align --target-org uat` | **Done**: removes from profiles, permission sets and translations the references to components the target org lacks, so that they deploy. See [align.md](align.md). |

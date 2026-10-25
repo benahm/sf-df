@@ -106,6 +106,29 @@
     },
     {
         "alias": [],
+        "command": "df:org:changes",
+        "flagAliases": [],
+        "flagChars": [
+            "a",
+            "f",
+            "m",
+            "o"
+        ],
+        "flags": [
+            "api-version",
+            "by",
+            "flags-dir",
+            "json",
+            "limit",
+            "metadata-type",
+            "output-file",
+            "since",
+            "target-org"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
         "command": "df:org:map",
         "flagAliases": [],
         "flagChars": [

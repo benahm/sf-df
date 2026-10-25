@@ -2,9 +2,12 @@ import { expect } from 'chai';
 
 import {
   buildListMetadataEnvelope,
+  buildListQueriesEnvelope,
   buildReadMetadataEnvelope,
   formatMetadataFile,
   isTransientError,
+  parseDescribeMetadataResponse,
+  parseFileProperties,
   parseListMetadataResponse,
   parseReadMetadataResponse,
   SoapFaultError,
@@ -33,6 +36,56 @@ describe('readMetadata as raw XML', () => {
         '</listMetadataResponse></soapenv:Body></soapenv:Envelope>';
 
       expect(parseListMetadataResponse(response)).to.deep.equal(['Admin', 'R&D']);
+    });
+
+    it('asks several types in one call, with the folder of a type stored in folders', () => {
+      expect(buildListQueriesEnvelope('token', [{ type: 'ApexClass' }, { type: 'Report', folder: 'R&D' }])).to.contain(
+        '<m:listMetadata><m:queries><m:type>ApexClass</m:type></m:queries>' +
+          '<m:queries><m:folder>R&amp;D</m:folder><m:type>Report</m:type></m:queries></m:listMetadata>'
+      );
+    });
+
+    it('returns the date, author and package state of each component, without the empty values', () => {
+      const response =
+        '<soapenv:Envelope><soapenv:Body><listMetadataResponse><result>' +
+        '<createdById>005A</createdById><fileName>classes/Foo.cls</fileName><fullName>Foo</fullName>' +
+        '<id>01pA</id><lastModifiedById>005B</lastModifiedById><lastModifiedByName>R&amp;D Admin</lastModifiedByName>' +
+        '<lastModifiedDate>2026-10-20T08:00:00.000Z</lastModifiedDate><manageableState>unmanaged</manageableState>' +
+        '<namespacePrefix></namespacePrefix><type>ApexClass</type></result>' +
+        '<result><fullName>NoType</fullName></result>' +
+        '</listMetadataResponse></soapenv:Body></soapenv:Envelope>';
+
+      expect(parseFileProperties(response)).to.deep.equal([
+        {
+          type: 'ApexClass',
+          fullName: 'Foo',
+          id: '01pA',
+          lastModifiedDate: '2026-10-20T08:00:00.000Z',
+          lastModifiedById: '005B',
+          lastModifiedByName: 'R&D Admin',
+          manageableState: 'unmanaged',
+        },
+      ]);
+    });
+  });
+
+  describe('describeMetadata', () => {
+    it('returns the types and their child types, and which are stored in folders', () => {
+      const response =
+        '<soapenv:Envelope><soapenv:Body><describeMetadataResponse><result>' +
+        '<metadataObjects><childXmlNames>CustomField</childXmlNames><childXmlNames>ListView</childXmlNames>' +
+        '<directoryName>objects</directoryName><inFolder>false</inFolder><metaFile>false</metaFile>' +
+        '<suffix>object</suffix><xmlName>CustomObject</xmlName></metadataObjects>' +
+        '<metadataObjects><directoryName>reports</directoryName><inFolder>true</inFolder><metaFile>false</metaFile>' +
+        '<suffix>report</suffix><xmlName>Report</xmlName></metadataObjects>' +
+        '</result></describeMetadataResponse></soapenv:Body></soapenv:Envelope>';
+
+      expect(parseDescribeMetadataResponse(response)).to.deep.equal([
+        { name: 'CustomObject', inFolder: false },
+        { name: 'CustomField', inFolder: false },
+        { name: 'ListView', inFolder: false },
+        { name: 'Report', inFolder: true },
+      ]);
     });
   });
 

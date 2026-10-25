@@ -113,6 +113,25 @@ was deleted in git. These rules come from real deployments and are covered by te
 
 Details: [docs/git-delta-metadata-strategies.md](docs/git-delta-metadata-strategies.md).
 
+## List what changed in an org: `sf df org changes`
+
+`sf df org changes` lists the latest metadata changes of an org, with their date and author, and writes them to a
+`package.xml` to retrieve them. It combines the dates of the Metadata API, source tracking (the only source of
+deletions) and the permission rows of the project's profiles and permission sets: an access changed in Setup moves no
+other date.
+
+```bash
+# The 20 latest changes
+sf df org changes --target-org int
+
+# Every change I made since October 20, then retrieve them with complete profiles
+sf df org changes --target-org int --since 2026-10-20 --by me --output-file changes.xml
+sf project retrieve start --manifest changes.xml
+sf df profile retrieve --manifest changes.xml
+```
+
+Details and the rules verified on an org: [docs/org-changes.md](docs/org-changes.md).
+
 ## Retrieve complete profiles: `sf df profile retrieve`
 
 `sf project retrieve start -m Profile:Admin` only returns the accesses to the components retrieved in the same
@@ -304,6 +323,7 @@ Documentation:
 - [Usage and output](docs/git-delta-usage.md)
 - [Architecture](docs/git-delta-architecture.md)
 - [Metadata strategies](docs/git-delta-metadata-strategies.md)
+- [Org changes](docs/org-changes.md)
 - [Profile retrieve](docs/profile-retrieve.md)
 - [Profile to permission set](docs/profile-to-permset.md)
 - [Org align](docs/align.md)
@@ -321,6 +341,7 @@ Documentation:
 * [`sf df git merge-driver run`](#sf-df-git-merge-driver-run)
 * [`sf df git merge-driver uninstall`](#sf-df-git-merge-driver-uninstall)
 * [`sf df org align`](#sf-df-org-align)
+* [`sf df org changes`](#sf-df-org-changes)
 * [`sf df org map`](#sf-df-org-map)
 * [`sf df profile retrieve`](#sf-df-profile-retrieve)
 * [`sf df profile to-permset`](#sf-df-profile-to-permset)
@@ -654,6 +675,98 @@ FLAG DESCRIPTIONS
 ```
 
 _See code: [src/commands/df/org/align.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/org/align.ts)_
+
+## `sf df org changes`
+
+List the latest metadata changes made in an org, with their date and author.
+
+```
+USAGE
+  $ sf df org changes -o <value> [--json] [--flags-dir <value>] [-a <value>] [--since <value>] [--limit <value>]
+    [--by <value>...] [-m <value>...] [-f <value>]
+
+FLAGS
+  -a, --api-version=<value>       API version of the calls.
+  -f, --output-file=<value>       Write the changed components to this package.xml.
+  -m, --metadata-type=<value>...  Only list these metadata types, for example ApexClass or CustomField.
+  -o, --target-org=<value>        (required) Org whose changes are listed.
+      --by=<value>...             Only list the changes of this user: me, a username, a user Id or a full name.
+      --limit=<value>             Number of changes listed, newest first.
+      --since=<value>             List every change made since this date: 2026-10-20 (local midnight) or
+                                  2026-10-20T14:30:00Z.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  List the latest metadata changes made in an org, with their date and author.
+
+  Lists the components of the org with the date and author of their last change, newest first: the 20 latest by default,
+  every change since a date with --since. --output-file writes them to a package.xml, to retrieve them.
+
+  Dates come from three sources:
+
+  - the date and author the Metadata API gives every component;
+  - source tracking, when the org has it: the only source of deleted components;
+  - the accesses of the profiles and permission sets of the project: an access changed in Setup moves neither the date
+  of the profile nor source tracking. These changes have no author, and are listed whatever --by says. A revoked access
+  leaves no trace.
+
+  Some types have no date (the CustomLabels container, standard objects, settings): their changes show on their children
+  (CustomLabel, the fields of a standard object) or not at all. Components of installed packages and changes made by
+  Automated Process are left out. Types stored in folders (reports, dashboards, documents, email templates) are listed
+  only when asked with --metadata-type.
+
+EXAMPLES
+  List the 20 latest changes of the org "int":
+
+    $ sf df org changes --target-org int
+
+  List my changes since October 20:
+
+    $ sf df org changes --target-org int --since 2026-10-20 --by me
+
+  List the Apex classes and custom fields changed since October 20:
+
+    $ sf df org changes --target-org int --since 2026-10-20 --metadata-type ApexClass --metadata-type CustomField
+
+  Write the changes since October 20 to a manifest, then retrieve them with complete profiles:
+
+    $ sf df org changes --target-org int --since 2026-10-20 --output-file changes.xml
+    $ sf project retrieve start --manifest changes.xml
+    $ sf df profile retrieve --manifest changes.xml
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  API version of the calls.
+
+    Override the api version used for api requests made by this command
+
+  -f, --output-file=<value>  Write the changed components to this package.xml.
+
+    Deleted components are left out: they can't be retrieved. Retrieve the components with `sf project retrieve start
+    --manifest`, then the complete profiles with `sf df profile retrieve --manifest`.
+
+  -m, --metadata-type=<value>...  Only list these metadata types, for example ApexClass or CustomField.
+
+    Can be specified multiple times. Types stored in folders (Report, Dashboard, Document, EmailTemplate) are listed
+    only with this flag: one call per folder makes them slow.
+
+  --by=<value>...  Only list the changes of this user: me, a username, a user Id or a full name.
+
+    Can be specified multiple times. A full name two users share is refused: give the username. The changes of accesses
+    have no author: they are listed whatever --by says.
+
+  --limit=<value>  Number of changes listed, newest first.
+
+    Defaults to 20 without --since, and to every change with it.
+
+  --since=<value>  List every change made since this date: 2026-10-20 (local midnight) or 2026-10-20T14:30:00Z.
+
+    Without --since, the 20 latest changes are listed. With it, every change since the date, unless --limit is set.
+```
+
+_See code: [src/commands/df/org/changes.ts](https://github.com/benahm/sf-df/blob/v0.0.5-beta/src/commands/df/org/changes.ts)_
 
 ## `sf df org map`
 

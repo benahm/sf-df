@@ -188,6 +188,12 @@ Takes about 2 minutes. See [profile-retrieve.md](profile-retrieve.md).
 checks that both together grant exactly what the profile granted alone. Everything is deleted at the end. See
 [profile-to-permset.md](profile-to-permset.md).
 
+### Org changes on an org
+
+`test/e2e-org/org-changes.org.e2e.test.ts` deploys an Apex class (`SfDfQa*`), checks that `sf df org changes` lists it
+as a change of the current user, that its manifest retrieves it into an empty project, then deletes it and checks it
+is listed as deleted when the org has source tracking. Takes about 40 s. See [org-changes.md](org-changes.md).
+
 Useful environment variables:
 
 1. `RUN_E2E_ORG=true`: enable org test execution.

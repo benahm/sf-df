@@ -32,6 +32,32 @@ export const buildListMetadataEnvelope = (sessionId: string, type: string): stri
     `<m:listMetadata><m:queries><m:type>${escapeXml(type)}</m:type></m:queries></m:listMetadata>`
   );
 
+// A listMetadata query: a type, and the folder for the types stored in folders (reports, email templates...).
+export type ListQuery = { type: string; folder?: string };
+
+// listMetadata takes up to 3 queries per call.
+export const LIST_QUERIES_PER_CALL = 3;
+
+export const buildListQueriesEnvelope = (sessionId: string, queries: ListQuery[]): string =>
+  buildEnvelope(
+    sessionId,
+    '<m:listMetadata>' +
+      queries
+        .map(
+          ({ type, folder }) =>
+            `<m:queries>${folder === undefined ? '' : `<m:folder>${escapeXml(folder)}</m:folder>`}` +
+            `<m:type>${escapeXml(type)}</m:type></m:queries>`
+        )
+        .join('') +
+      '</m:listMetadata>'
+  );
+
+export const buildDescribeMetadataEnvelope = (sessionId: string, apiVersion: string): string =>
+  buildEnvelope(
+    sessionId,
+    `<m:describeMetadata><m:asOfVersion>${escapeXml(apiVersion)}</m:asOfVersion></m:describeMetadata>`
+  );
+
 export class SoapFaultError extends Error {
   public constructor(public readonly faultCode: string, message: string) {
     super(message);
@@ -89,6 +115,79 @@ export const parseListMetadataEntries = (response: string): ListedComponent[] =>
 // Full names of a listMetadata response, as the org returns them.
 export const parseListMetadataResponse = (response: string): string[] =>
   parseListMetadataEntries(response).map((entry) => entry.fullName);
+
+// The FileProperties of a listMetadata result that sf df reads. A date of 1970 means the type has no date.
+export type FileProperties = {
+  type: string;
+  fullName: string;
+  id?: string;
+  lastModifiedDate?: string;
+  lastModifiedById?: string;
+  lastModifiedByName?: string;
+  manageableState?: string;
+  namespacePrefix?: string;
+};
+
+const FILE_PROPERTIES = [
+  'id',
+  'lastModifiedDate',
+  'lastModifiedById',
+  'lastModifiedByName',
+  'manageableState',
+  'namespacePrefix',
+] as const;
+
+const leafText = (xml: string, name: string): string | undefined => {
+  const match = new RegExp(`<${name}>([^<]*)</${name}>`).exec(xml);
+  return match && match[1] !== '' ? decodeText(match[1]) : undefined;
+};
+
+export const parseFileProperties = (response: string): FileProperties[] => {
+  assertResponse(response, 'listMetadata');
+  return [...response.matchAll(LIST_RESULT)].flatMap(([, result]): FileProperties[] => {
+    const fullName = leafText(result, 'fullName');
+    const type = leafText(result, 'type');
+    if (fullName === undefined || type === undefined) {
+      return [];
+    }
+
+    const properties: FileProperties = { type, fullName };
+    for (const name of FILE_PROPERTIES) {
+      const value = leafText(result, name);
+      if (value !== undefined) {
+        properties[name] = value;
+      }
+    }
+
+    return [properties];
+  });
+};
+
+// A metadata type of the org. Child types (CustomField, CustomLabel...) are listed as types of their own.
+export type MetadataTypeInfo = { name: string; inFolder: boolean };
+
+const METADATA_OBJECT = /<metadataObjects>([\s\S]*?)<\/metadataObjects>/g;
+const CHILD_XML_NAME = /<childXmlNames>([^<]*)<\/childXmlNames>/g;
+
+export const parseDescribeMetadataResponse = (response: string): MetadataTypeInfo[] => {
+  assertResponse(response, 'describeMetadata');
+  const types = new Map<string, MetadataTypeInfo>();
+  for (const [, object] of response.matchAll(METADATA_OBJECT)) {
+    const name = leafText(object, 'xmlName');
+    if (name !== undefined) {
+      types.set(name, { name, inFolder: leafText(object, 'inFolder') === 'true' });
+    }
+
+    for (const [, child] of object.matchAll(CHILD_XML_NAME)) {
+      const childName = decodeText(child);
+      if (!types.has(childName)) {
+        types.set(childName, { name: childName, inFolder: false });
+      }
+    }
+  }
+
+  return [...types.values()];
+};
 
 export const parseReadMetadataResponse = (response: string): Array<ReadMetadataRecord | undefined> => {
   assertResponse(response, 'readMetadata');
@@ -237,6 +336,25 @@ export const listMetadataEntries = async (
   options: ReadMetadataOptions = {}
 ): Promise<ListedComponent[]> =>
   callMetadataSoap(connection, (token) => buildListMetadataEnvelope(token, type), parseListMetadataEntries, options);
+
+// Up to LIST_QUERIES_PER_CALL queries in one call, with the dates and authors of the components.
+export const listFileProperties = async (
+  connection: Connection,
+  queries: ListQuery[],
+  options: ReadMetadataOptions = {}
+): Promise<FileProperties[]> =>
+  callMetadataSoap(connection, (token) => buildListQueriesEnvelope(token, queries), parseFileProperties, options);
+
+export const describeMetadataTypes = async (
+  connection: Connection,
+  options: ReadMetadataOptions = {}
+): Promise<MetadataTypeInfo[]> =>
+  callMetadataSoap(
+    connection,
+    (token) => buildDescribeMetadataEnvelope(token, connection.getApiVersion()),
+    parseDescribeMetadataResponse,
+    options
+  );
 
 const callMetadataSoap = async <T>(
   connection: Connection,

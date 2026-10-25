@@ -18,6 +18,7 @@ const ORDER = [
   'df:git:merge-driver:install',
   'df:git:merge-driver:run',
   'df:git:merge-driver:uninstall',
+  'df:org:changes',
   'df:profile:retrieve',
   'df:profile:to-permset',
   'df:org:align',
