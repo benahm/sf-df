@@ -12,10 +12,14 @@ import { SnapshotManager } from './snapshot.js';
 import { StrategyRegistry } from './strategies/strategy-registry.js';
 import type {
   DeltaArtifacts,
+  DeltaComponent,
+  DeltaComponentAction,
   DeltaResult,
   DeltaSummary,
   GitChange,
   GitChangeStatus,
+  ManifestEntry,
+  OperationKind,
   ProcessOperation,
   ResolvedOperation,
   SnapshotRef,
@@ -32,13 +36,79 @@ const emptyCountsByStatus =(): Record<GitChangeStatus, number> => ({
   rename: 0,
 });
 
+// A git change behind a manifest entry, as the operation that built it saw it: `kind` is the side after the
+// redirection of a partial bundle delete, `path` the file on that side (the old path of a renamed file when destructive).
+type EntrySource = {
+  change: GitChange;
+  kind: OperationKind;
+  path: string;
+};
+
+// Manifest entries by `type#fullName`, with the git changes that produced them, in git order.
+type ManifestEntries = Map<string, { entry: ManifestEntry; sources: EntrySource[] }>;
+
+const entryKey = ({ type, fullName }: ManifestEntry): string => `${type}#${fullName}`;
+
+const addEntries = (entries: ManifestEntries, manifestEntries: ManifestEntry[] | undefined, source: EntrySource): void => {
+  for (const entry of manifestEntries ?? []) {
+    const existing = entries.get(entryKey(entry));
+    if (existing) {
+      existing.sources.push(source);
+    } else {
+      entries.set(entryKey(entry), { entry, sources: [source] });
+    }
+  }
+};
+
+const packageAction = (sources: EntrySource[]): DeltaComponentAction => {
+  // A deletion turned into a deployment: the inactive Flow or RecordType.
+  if (sources.some(({ kind }) => kind === 'destructive')) {
+    return 'deactivate';
+  }
+
+  if (sources.some(({ change }) => change.status === 'rename')) {
+    return 'rename';
+  }
+
+  // A file deleted from a bundle that still exists redeploys the bundle: a modification.
+  return sources.every(({ change }) => change.status === 'add') ? 'add' : 'modify';
+};
+
+const toComponent = (
+  { entry, sources }: { entry: ManifestEntry; sources: EntrySource[] },
+  manifest: DeltaComponent['manifest']
+): DeltaComponent => ({
+  type: entry.type,
+  fullName: entry.fullName,
+  action: manifest === 'package' ? packageAction(sources) : 'delete',
+  manifest,
+  files: [...new Set(sources.map(({ path: filePath }) => filePath))].sort(),
+});
+
+// The entries written to destructiveChanges.xml. The children dropped because their object is deleted go away with
+// it: their files are listed under the object.
+const destructiveComponents = (entries: ManifestEntries): DeltaComponent[] => {
+  const kept = new Set(dropComponentsOfDeletedObjects([...entries.values()].map(({ entry }) => entry)).map(entryKey));
+  const components: ManifestEntries = new Map(
+    [...entries].filter(([key]) => kept.has(key)).map(([key, { entry, sources }]) => [key, { entry, sources: [...sources] }])
+  );
+  const objects = [...components.values()].filter(({ entry }) => entry.type === 'CustomObject');
+
+  for (const [key, { entry, sources }] of entries) {
+    const owner = kept.has(key)
+      ? undefined
+      : objects.find((object) => [`${object.entry.fullName}.`, `${object.entry.fullName}-`].some((prefix) => entry.fullName.startsWith(prefix)));
+    owner?.sources.push(...sources);
+  }
+
+  return [...components.values()].map((component) => toComponent(component, 'destructive'));
+};
+
 const mergeArtifacts = async (
   artifacts: DeltaArtifacts,
   packageDir: string,
   destructiveDir: string,
-  summary: DeltaSummary,
-  packageEntries: Set<string>,
-  destructiveEntries: Set<string>
+  summary: DeltaSummary
 ): Promise<void> => {
   await Promise.all(
     [...(artifacts.packageFileCopies ?? [])].map(async ([relativePath, absoluteSourcePath]) =>
@@ -61,14 +131,6 @@ const mergeArtifacts = async (
       await writeFile(destinationPath, content, 'utf8');
     })
   );
-
-  for (const entry of artifacts.packageManifestEntries ?? []) {
-    packageEntries.add(`${entry.type}#${entry.fullName}`);
-  }
-
-  for (const entry of artifacts.destructiveManifestEntries ?? []) {
-    destructiveEntries.add(`${entry.type}#${entry.fullName}`);
-  }
 
   for (const warning of artifacts.warnings ?? []) {
     summary.warnings.push(warning);
@@ -122,12 +184,6 @@ const normalizeOperations = (
     },
   ];
 };
-
-const parseManifestSet = (entries: Set<string>): Array<{ type: string; fullName: string }> =>
-  [...entries].map((encoded) => {
-    const [type, fullName] = encoded.split('#');
-    return { type, fullName };
-  });
 
 const resolveOperation = async (operation: ProcessOperation): Promise<ResolvedOperation> => {
   const { resolvedMetadata, manifestEntry } = await resolvePath(operation.sourceSnapshot, operation.relativePath);
@@ -238,9 +294,11 @@ export const generateDelta = async (options: {
   const snapshotManager = new SnapshotManager(options.repoRoot, sourceDir);
   const source = options.source ?? gitSource(snapshotManager, options.repoRoot, options.from, options.to);
   const registry = new StrategyRegistry();
-  const packageEntries = new Set<string>();
-  const destructiveEntries = new Set<string>();
-  const dedupeKeys = new Set<string>();
+  const packageEntries: ManifestEntries = new Map();
+  const destructiveEntries: ManifestEntries = new Map();
+  // The artifacts already merged, by dedupe key: a later file of the same component (another file of a bundle...)
+  // is only recorded as one of its sources.
+  const mergedArtifacts = new Map<string, DeltaArtifacts>();
   const summary: DeltaSummary = {
     packageDir,
     destructiveDir,
@@ -249,6 +307,8 @@ export const generateDelta = async (options: {
     processedChanges: 0,
     countsByStatus: emptyCountsByStatus(),
     countsByStrategy: {},
+    components: [],
+    skippedFiles: [],
     warnings: [],
   };
 
@@ -265,9 +325,9 @@ export const generateDelta = async (options: {
   const isIgnoredInOld = forceIgnoreOf(oldSnapshot);
   const isIgnoredInNew = forceIgnoreOf(newSnapshot);
 
-  const gitChanges = sourceChanges.filter((change) =>
-    change.status === 'delete' ? !isIgnoredInOld(change.path) : !isIgnoredInNew(change.path)
-  );
+  const isIgnored = (change: GitChange): boolean =>
+    change.status === 'delete' ? isIgnoredInOld(change.path) : isIgnoredInNew(change.path);
+  const gitChanges = sourceChanges.filter((change) => !isIgnored(change));
 
   try {
     const operations = gitChanges.flatMap((change) => {
@@ -284,34 +344,58 @@ export const generateDelta = async (options: {
           // Resolve metadata once so strategy selection and generic fallback share the same context.
           const resolvedOperation = await redirectPartialBundleDelete(await resolveOperation(operation));
           const strategy = registry.getStrategy(resolvedOperation);
-          return { strategy, artifacts: await strategy.build(resolvedOperation) };
+          const entrySource: EntrySource = {
+            change: operation.change,
+            kind: resolvedOperation.operation.kind,
+            path: operation.relativePath,
+          };
+          return { strategy, entrySource, artifacts: await strategy.build(resolvedOperation) };
         })
       );
 
-      for (const { strategy, artifacts } of built) {
-        if (!artifacts || dedupeKeys.has(artifacts.dedupeKey)) {
+      for (const { strategy, entrySource, artifacts } of built) {
+        if (!artifacts) {
           continue;
         }
 
-        dedupeKeys.add(artifacts.dedupeKey);
+        const merged = mergedArtifacts.get(artifacts.dedupeKey);
+        addEntries(packageEntries, (merged ?? artifacts).packageManifestEntries, entrySource);
+        addEntries(destructiveEntries, (merged ?? artifacts).destructiveManifestEntries, entrySource);
+        if (merged) {
+          continue;
+        }
+
+        mergedArtifacts.set(artifacts.dedupeKey, artifacts);
         summary.countsByStrategy[strategy.name] = (summary.countsByStrategy[strategy.name] ?? 0) + 1;
         summary.processedChanges += 1;
         // eslint-disable-next-line no-await-in-loop
-        await mergeArtifacts(artifacts, packageDir, destructiveDir, summary, packageEntries, destructiveEntries);
+        await mergeArtifacts(artifacts, packageDir, destructiveDir, summary);
       }
     }
+
+    summary.components = [
+      ...[...packageEntries.values()].map((component) => toComponent(component, 'package')),
+      ...destructiveComponents(destructiveEntries),
+    ];
+    const changesInDelta = new Set(
+      [...packageEntries.values(), ...destructiveEntries.values()].flatMap(({ sources }) => sources.map(({ change }) => change))
+    );
+    summary.skippedFiles = [
+      ...sourceChanges.filter(isIgnored).map((change) => ({ path: change.path, reason: 'forceignore' as const })),
+      ...gitChanges.filter((change) => !changesInDelta.has(change)).map((change) => ({ path: change.path, reason: 'no-change' as const })),
+    ];
 
     const apiVersion = await readSourceApiVersion(options.repoRoot);
     await writeFile(
       summary.packageManifestPath,
-      await buildManifestXml(parseManifestSet(packageEntries), apiVersion),
+      await buildManifestXml([...packageEntries.values()].map(({ entry }) => entry), apiVersion),
       'utf8'
     );
 
     if (destructiveEntries.size > 0) {
       await writeFile(
         summary.destructiveManifestPath!,
-        await buildManifestXml(dropComponentsOfDeletedObjects(parseManifestSet(destructiveEntries)), apiVersion),
+        await buildManifestXml(dropComponentsOfDeletedObjects([...destructiveEntries.values()].map(({ entry }) => entry)), apiVersion),
         'utf8'
       );
       // `sf project deploy start --post-destructive-changes` only works alongside --manifest,

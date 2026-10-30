@@ -64,9 +64,37 @@ Delta generated
 
 Delta generation failed
 
-# info.summary
+# info.range
 
-Processed %s delta operations.
+🔍 Delta %s → %s
+
+# info.workingTree
+
+working tree
+
+# info.changedFiles
+
+%s: %s.
+
+# info.noChange
+
+No metadata file changed.
+
+# info.nothingToDeploy
+
+✅ Nothing to deploy.
+
+# info.ready
+
+✅ Delta ready: %s to deploy, %s to delete
+
+# info.header.package
+
+📦 Deploy · %s
+
+# info.header.destructive
+
+🧹 Delete · %s
 
 # examples
 

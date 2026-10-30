@@ -1,8 +1,11 @@
+import path from 'node:path';
+
 import { Messages } from '@salesforce/core';
-import { Flags, SfCommand } from '@salesforce/sf-plugins-core';
+import { Flags, SfCommand, StandardColors } from '@salesforce/sf-plugins-core';
+import ansis from 'ansis';
 
 import { generateDelta } from '../../../delta/engine.js';
-import type { DeltaResult } from '../../../delta/types.js';
+import type { DeltaComponentAction, DeltaResult, GitChangeStatus } from '../../../delta/types.js';
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url);
 const messages = Messages.loadMessages('sf-df', 'df.git.delta');
@@ -63,7 +66,7 @@ export default class GitDelta extends SfCommand<DeltaResult> {
       });
 
       this.spinner.stop(messages.getMessage('spinner.success'));
-      this.log(messages.getMessage('info.summary', [String(result.processedChanges)]));
+      this.report(result);
 
       for (const warning of result.warnings) {
         this.warn(warning);
@@ -75,4 +78,111 @@ export default class GitDelta extends SfCommand<DeltaResult> {
       throw error;
     }
   }
+
+  private report(result: DeltaResult): void {
+    const fromSourceDir = (file: string): string =>
+      file.startsWith(`${result.sourceDir}/`) ? file.slice(result.sourceDir.length + 1) : file;
+    const changes = (Object.entries(result.countsByStatus) as Array<[GitChangeStatus, number]>).filter(([, count]) => count > 0);
+    const changedFiles = changes.reduce((total, [, count]) => total + count, 0);
+
+    this.log(
+      ansis.bold(messages.getMessage('info.range', [result.from, result.to ?? messages.getMessage('info.workingTree')])) +
+        StandardColors.info(` (${result.sourceDir})`)
+    );
+    this.log(
+      changedFiles === 0
+        ? messages.getMessage('info.noChange')
+        : messages.getMessage('info.changedFiles', [
+            plural(changedFiles, 'changed file'),
+            changes.map(([status, count]) => `${count} ${STATUS_LABELS[status]}`).join(', '),
+          ])
+    );
+
+    const sections = (['package', 'destructive'] as const).map((manifest) => ({
+      manifest,
+      components: result.components
+        .filter((component) => component.manifest === manifest)
+        .sort((a, b) => a.type.localeCompare(b.type) || a.fullName.localeCompare(b.fullName)),
+    }));
+
+    // A table ends with its own blank line: the next section only needs one when no table came before.
+    let afterTable = false;
+    for (const { manifest, components } of sections) {
+      if (components.length === 0) {
+        continue;
+      }
+
+      const manifestPath = manifest === 'package' ? result.packageManifestPath : result.destructiveManifestPath!;
+      this.header(
+        messages.getMessage(`info.header.${manifest}`, [plural(components.length, 'component')]),
+        path.relative(process.cwd(), manifestPath),
+        !afterTable
+      );
+      // One row per file: @oclif/table does not pad the lines of a multi-line cell, which breaks its border.
+      this.table({
+        data: components.flatMap((component) =>
+          displayedFiles(component.files.map(fromSourceDir)).map((file, index) =>
+            index === 0
+              ? { action: ACTION_LABELS[component.action], type: component.type, name: component.fullName, files: file }
+              : { action: '', type: '', name: '', files: file }
+          )
+        ),
+        columns: [
+          { key: 'action', name: 'Action' },
+          { key: 'type', name: 'Type' },
+          { key: 'name', name: 'Name' },
+          { key: 'files', name: `Files (in ${result.sourceDir})` },
+        ],
+      });
+      afterTable = true;
+    }
+
+    const [deployed, deleted] = sections.map(({ components }) => components.length);
+    if (!afterTable) {
+      this.log();
+    }
+
+    this.log(
+      deployed + deleted === 0
+        ? ansis.bold(messages.getMessage('info.nothingToDeploy'))
+        : ansis.bold.green(messages.getMessage('info.ready', [plural(deployed, 'component'), String(deleted)])) +
+            (result.warnings.length > 0 ? ansis.yellow(` · ${plural(result.warnings.length, 'warning')}`) : '')
+    );
+  }
+
+  // A section title: one emoji, bold, then where it is written.
+  private header(title: string, location?: string, blankLineBefore = true): void {
+    if (blankLineBefore) {
+      this.log();
+    }
+
+    this.log(ansis.bold(title) + (location ? StandardColors.info(` → ${location}`) : ''));
+  }
 }
+
+const STATUS_LABELS: Record<GitChangeStatus, string> = { add: 'added', modify: 'modified', delete: 'deleted', rename: 'renamed' };
+
+const ACTION_LABELS: Record<DeltaComponentAction, string> = {
+  // Single-width symbols only: an emoji in a cell is drawn one or two columns wide depending on the terminal, which
+  // breaks the borders of the table.
+  add: ansis.green('+ Added'),
+  modify: ansis.yellow('~ Modified'),
+  rename: ansis.cyan('→ Renamed'),
+  deactivate: ansis.magenta('⊘ Deactivated'),
+  delete: ansis.red('− Deleted'),
+};
+
+const MAX_DISPLAYED_FILES = 3;
+
+const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+// The -meta.xml next to its source file (Foo.cls and Foo.cls-meta.xml) adds nothing to read.
+const displayedFiles = (files: string[]): string[] => {
+  const shown = files.filter((file) => !(file.endsWith('-meta.xml') && files.includes(file.slice(0, -'-meta.xml'.length))));
+  const lines = shown.slice(0, MAX_DISPLAYED_FILES);
+  if (shown.length > MAX_DISPLAYED_FILES) {
+    lines.push(StandardColors.info(`+${shown.length - MAX_DISPLAYED_FILES} more`));
+  }
+
+  return lines;
+};

@@ -60,6 +60,18 @@
             "type": "number"
           }
         },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DeltaComponent"
+          }
+        },
+        "skippedFiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DeltaSkippedFile"
+          }
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -68,15 +80,82 @@
         }
       },
       "required": [
+        "components",
         "countsByStatus",
         "countsByStrategy",
         "from",
         "packageDir",
         "packageManifestPath",
         "processedChanges",
+        "skippedFiles",
         "sourceDir",
         "warnings"
       ]
+    },
+    "DeltaComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/DeltaComponentAction"
+        },
+        "manifest": {
+          "type": "string",
+          "enum": [
+            "package",
+            "destructive"
+          ]
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "files",
+        "fullName",
+        "manifest",
+        "type"
+      ]
+    },
+    "DeltaComponentAction": {
+      "type": "string",
+      "enum": [
+        "add",
+        "modify",
+        "rename",
+        "delete",
+        "deactivate"
+      ]
+    },
+    "DeltaSkippedFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "forceignore",
+            "no-change"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "reason"
+      ],
+      "additionalProperties": false
     }
   }
 }

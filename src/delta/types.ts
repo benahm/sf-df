@@ -64,6 +64,24 @@ export type DeltaArtifacts = {
   warnings?: string[];
 };
 
+// What happens to a component in the org: `deactivate` replaces a deletion the Metadata API refuses (Flow, RecordType).
+// A component edited inside a container file (a label of CustomLabels...) is `modify`, even when the element is new.
+export type DeltaComponentAction = 'add' | 'modify' | 'rename' | 'delete' | 'deactivate';
+
+export type DeltaComponent = ManifestEntry & {
+  action: DeltaComponentAction;
+  manifest: 'package' | 'destructive';
+  // The changed git files behind the component, relative to the repository root.
+  files: string[];
+};
+
+// A changed file that puts nothing in the manifests: excluded by .forceignore, or a change with no effect on the org
+// (pure reformatting, a deleted translation...).
+export type DeltaSkippedFile = {
+  path: string;
+  reason: 'forceignore' | 'no-change';
+};
+
 export type DeltaSummary = {
   packageDir: string;
   destructiveDir?: string;
@@ -72,6 +90,8 @@ export type DeltaSummary = {
   processedChanges: number;
   countsByStatus: Record<GitChangeStatus, number>;
   countsByStrategy: Record<string, number>;
+  components: DeltaComponent[];
+  skippedFiles: DeltaSkippedFile[];
   warnings: string[];
 };
 

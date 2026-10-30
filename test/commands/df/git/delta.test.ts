@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import { TestContext } from '@salesforce/core/testSetup';
 import { stubSfCommandUx } from '@salesforce/sf-plugins-core';
+import ansis from 'ansis';
 import { expect } from 'chai';
 
 import GitDelta from '../../../../src/commands/df/git/delta.js';
@@ -59,7 +60,9 @@ describe('df git delta', () => {
       .getCalls()
       .flatMap((call) => call.args)
       .join('\n');
-    expect(output).to.include('Processed 1 delta operations.');
+    expect(output).to.include('1 changed file: 1 modified.');
+    const rows = sfCommandStubs.table.firstCall.args[0].data.map((data) => ansis.strip(Object.values(data).join(' | ')));
+    expect(rows).to.deep.equal(['~ Modified | ApexClass | MyClass | classes/MyClass.cls']);
   });
 
   it('requires --from', async () => {

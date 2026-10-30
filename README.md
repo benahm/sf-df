@@ -47,7 +47,7 @@ sf df git delta --from main --to feature/my-branch --deploy-dir delta/deploy --d
 | `-d, --deploy-dir` | Folder of the package to deploy. **Required.** |
 | `--destructive-dir` | Folder of the destructive changes. Defaults to `<deploy-dir>-destructive`, next to the deploy folder. Neither folder can be inside the other. |
 | `-s, --source-dir` | Metadata folder to inspect. Defaults to `force-app/main/default`. |
-| `--json` | Result as JSON (counts per status and strategy, warnings, generated paths). Its format is pinned by [`schemas/df-git-delta.json`](schemas/df-git-delta.json). |
+| `--json` | Result as JSON (components with their action and git files, skipped files, counts per status and strategy, warnings, generated paths). Its format is pinned by [`schemas/df-git-delta.json`](schemas/df-git-delta.json). |
 
 Files excluded by the project's `.forceignore` (at each compared ref) are left out of the delta, as with
 `sf project deploy`.
@@ -63,6 +63,44 @@ delta/destructive/                   # --destructive-dir
   destructiveChanges.xml
   force-app/main/default/...         # partial XML of the deleted elements (for review)
 ```
+
+The terminal shows each component of the delta, what happens to it in the org and the git files behind it:
+
+```text
+🔍 Delta HEAD → working tree (force-app/main/default)
+13 changed files: 3 added, 4 modified, 5 deleted, 1 renamed.
+
+📦 Deploy · 7 components → delta/deploy/package.xml
+┌───────────────┬──────────────────────────┬───────────────────┬─────────────────────────────────────────────────┐
+│ Action        │ Type                     │ Name              │ Files (in force-app/main/default)               │
+├───────────────┼──────────────────────────┼───────────────────┼─────────────────────────────────────────────────┤
+│ ~ Modified    │ ApexClass                │ AccountService    │ classes/AccountService.cls                      │
+│ → Renamed     │ ApexClass                │ Helper            │ classes/Helper.cls                              │
+│ + Added       │ ApexClass                │ NewOne            │ classes/NewOne.cls                              │
+│ ~ Modified    │ CustomField              │ Account.Rating__c │ objects/Account/fields/Rating__c.field-meta.xml │
+│ ~ Modified    │ CustomLabels             │ CustomLabels      │ labels/CustomLabels.labels-meta.xml             │
+│ ⊘ Deactivated │ FlowDefinition           │ Old_Flow          │ flows/Old_Flow.flow-meta.xml                    │
+│ ~ Modified    │ LightningComponentBundle │ accountCard       │ lwc/accountCard/accountCard.html                │
+│               │                          │                   │ lwc/accountCard/accountCard.js                  │
+└───────────────┴──────────────────────────┴───────────────────┴─────────────────────────────────────────────────┘
+
+🧹 Delete · 3 components → delta/deploy-destructive/destructiveChanges.xml
+┌───────────┬─────────────┬───────────┬─────────────────────────────────────┐
+│ Action    │ Type        │ Name      │ Files (in force-app/main/default)   │
+├───────────┼─────────────┼───────────┼─────────────────────────────────────┤
+│ − Deleted │ ApexClass   │ Legacy    │ classes/Legacy.cls                  │
+│ − Deleted │ ApexClass   │ OldHelper │ classes/OldHelper.cls               │
+│ − Deleted │ CustomLabel │ Bye       │ labels/CustomLabels.labels-meta.xml │
+└───────────┴─────────────┴───────────┴─────────────────────────────────────┘
+
+✅ Delta ready: 7 components to deploy, 3 to delete · 1 warning
+```
+
+- **+ Added** / **~ Modified** / **→ Renamed**: deployed. An element edited inside a container file (a label of
+  `CustomLabels`...) is *Modified*, even when it is new; a file deleted from a bundle that still exists redeploys the
+  bundle (*Modified*).
+- **⊘ Deactivated**: deleted in git, but the Metadata API cannot delete it (Flow, RecordType): it is deployed inactive.
+- **− Deleted**: listed in `destructiveChanges.xml`. The children of a deleted object are listed under the object.
 
 ### Deploy
 
