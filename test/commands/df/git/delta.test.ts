@@ -36,6 +36,7 @@ describe('df git delta', () => {
     runGit(repoRoot, ['add', '.']);
     runGit(repoRoot, ['commit', '-m', 'base']);
     await writeFile(classPath, 'public class MyClass { }\n', 'utf8');
+    runGit(repoRoot, ['commit', '-am', 'change']);
 
     // The command diffs the repository it is launched from.
     process.chdir(repoRoot);
@@ -48,7 +49,7 @@ describe('df git delta', () => {
   });
 
   it('generates the delta and returns the result', async () => {
-    const result = await GitDelta.run(['--from', 'HEAD', '--deploy-dir', 'deploy', '--destructive-dir', 'destructive']);
+    const result = await GitDelta.run(['--from', 'HEAD~1', '--deploy-dir', 'deploy', '--destructive-dir', 'destructive']);
 
     expect(result.processedChanges).to.equal(1);
     expect(result.countsByStrategy).to.deep.equal({ generic: 1 });
@@ -65,6 +66,25 @@ describe('df git delta', () => {
     expect(rows).to.deep.equal(['~ Modified | ApexClass | MyClass | classes/MyClass.cls']);
   });
 
+  // Deliberate gap with sfdx mdt:git:delta, which copied the files on disk whatever --to was.
+  it('reads --to from git, HEAD by default, and warns about the uncommitted files it leaves out', async () => {
+    const classPath = path.join(repoRoot, 'force-app/main/default/classes/MyClass.cls');
+    await writeFile(classPath, 'public class MyClass { /* not committed */ }\n', 'utf8');
+    await writeFile(path.join(repoRoot, 'force-app/main/default/classes/Untracked.cls'), 'public class Untracked {}\n', 'utf8');
+
+    const result = await GitDelta.run(['--from', 'HEAD~1', '--deploy-dir', 'deploy']);
+
+    expect(result.to).to.equal('HEAD');
+    expect(result.processedChanges).to.equal(1);
+    expect(await readFile(path.join(repoRoot, 'deploy/force-app/main/default/classes/MyClass.cls'), 'utf8')).to.not.contain(
+      'not committed'
+    );
+    const warnings = sfCommandStubs.warn.getCalls().map((call) => call.args[0] as string);
+    expect(warnings).to.deep.equal([
+      '2 uncommitted files in force-app/main/default left out of the delta: --to defaults to HEAD. Commit them to include them.',
+    ]);
+  });
+
   it('requires --from', async () => {
     try {
       await GitDelta.run(['--deploy-dir', 'deploy']);
@@ -75,13 +95,13 @@ describe('df git delta', () => {
   });
 
   it('writes the destructive changes next to the deploy directory by default', async () => {
-    const result = await GitDelta.run(['--from', 'HEAD', '--deploy-dir', 'deploy']);
+    const result = await GitDelta.run(['--from', 'HEAD~1', '--deploy-dir', 'deploy']);
 
     expect(result.destructiveDir).to.equal(path.join(repoRoot, 'deploy-destructive'));
   });
 
   it('accepts the sfdx mdt:git:delta flag names', async () => {
-    const result = await GitDelta.run(['--from', 'HEAD', '--packagedir', 'deploy', '--descructivedir', 'destructive']);
+    const result = await GitDelta.run(['--from', 'HEAD~1', '--packagedir', 'deploy', '--descructivedir', 'destructive']);
 
     expect(result.packageDir).to.equal(path.join(repoRoot, 'deploy'));
     expect(result.destructiveDir).to.equal(path.join(repoRoot, 'destructive'));
@@ -89,7 +109,7 @@ describe('df git delta', () => {
 
   it('refuses a destructive directory inside the deploy directory', async () => {
     try {
-      await GitDelta.run(['--from', 'HEAD', '--deploy-dir', 'deploy', '--destructive-dir', 'deploy/destructive']);
+      await GitDelta.run(['--from', 'HEAD~1', '--deploy-dir', 'deploy', '--destructive-dir', 'deploy/destructive']);
       expect.fail('expected the nested directories to be refused');
     } catch (error) {
       expect((error as Error).message).to.include('must not contain each other');

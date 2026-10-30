@@ -26,7 +26,7 @@ Git ref used as the target point.
 
 # flags.to.description
 
-Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used as it is on disk, including files not added to git yet (files excluded by .gitignore are left out).
+Commit, tag, or branch used as the target snapshot. Defaults to HEAD: files are read from git, never from disk, so uncommitted changes are left out (a warning counts them). Unlike sfdx mdt:git:delta, which copied the files on disk whatever --to was.
 
 # flags.deploy-dir.summary
 
@@ -72,6 +72,10 @@ Delta generation failed
 
 working tree
 
+# warning.uncommitted
+
+%s in %s left out of the delta: --to defaults to HEAD. Commit them to include them.
+
 # info.changedFiles
 
 %s: %s.
@@ -98,7 +102,7 @@ No metadata file changed.
 
 # examples
 
-- Generate a delta against the current workspace:
+- Generate the delta of the last commit:
 
   <%= config.bin %> <%= command.id %> --from HEAD~1 --deploy-dir delta/deploy
 

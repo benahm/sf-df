@@ -5,6 +5,7 @@ import { Flags, SfCommand, StandardColors } from '@salesforce/sf-plugins-core';
 import ansis from 'ansis';
 
 import { generateDelta } from '../../../delta/engine.js';
+import { getUncommittedFiles } from '../../../delta/git.js';
 import type { DeltaComponentAction, DeltaResult, GitChangeStatus } from '../../../delta/types.js';
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url);
@@ -24,6 +25,7 @@ export default class GitDelta extends SfCommand<DeltaResult> {
     }),
     to: Flags.string({
       char: 't',
+      default: 'HEAD',
       summary: messages.getMessage('flags.to.summary'),
       description: messages.getMessage('flags.to.description'),
     }),
@@ -70,6 +72,14 @@ export default class GitDelta extends SfCommand<DeltaResult> {
 
       for (const warning of result.warnings) {
         this.warn(warning);
+      }
+
+      // sfdx mdt:git:delta read the files on disk: say what a delta to HEAD leaves out.
+      if (flags.to === 'HEAD') {
+        const uncommitted = await getUncommittedFiles(process.cwd(), result.sourceDir);
+        if (uncommitted.length > 0) {
+          this.warn(messages.getMessage('warning.uncommitted', [plural(uncommitted.length, 'uncommitted file'), result.sourceDir]));
+        }
       }
 
       return result;

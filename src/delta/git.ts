@@ -25,8 +25,8 @@ const parseStatus = (rawStatus: string): GitChangeStatus => {
 const hasTwoPaths = (rawStatus: string): boolean => rawStatus.startsWith('R') || rawStatus.startsWith('C');
 
 // Files on disk that were never added to git, minus the ignored ones: `git diff` does not see them.
-const getUntrackedFiles = async (cwd: string): Promise<string[]> => {
-  const { stdout } = await execFileAsync('git', ['ls-files', '--others', '--exclude-standard', '--full-name', '-z'], {
+const getUntrackedFiles = async (cwd: string, pathspec = '.'): Promise<string[]> => {
+  const { stdout } = await execFileAsync('git', ['ls-files', '--others', '--exclude-standard', '--full-name', '-z', '--', pathspec], {
     cwd,
     maxBuffer: 10 * 1024 * 1024,
   });
@@ -72,4 +72,13 @@ export const getGitChanges = async (cwd: string, from: string, to?: string): Pro
   }
 
   return changes;
+};
+
+// Files of `sourceDir` that differ from HEAD on disk (staged or not, untracked included): a delta to HEAD leaves them out.
+export const getUncommittedFiles = async (cwd: string, sourceDir: string): Promise<string[]> => {
+  const { stdout } = await execFileAsync('git', ['diff', 'HEAD', '--name-only', '-z', '--', sourceDir], {
+    cwd,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return [...stdout.split('\0').filter(Boolean), ...(await getUntrackedFiles(cwd, sourceDir))];
 };

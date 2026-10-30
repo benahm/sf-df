@@ -102,12 +102,12 @@ Chacune est couverte par `test/delta/sandbox-findings.test.ts`.
 | `StandardValueSet` supprimé | `is standard and cannot be deleted` | rien de destructive, warning |
 | `GlobalValueSet` utilisée par un champ supprimé | le champ reste 15 jours dans la corbeille et bloque | rien à faire côté delta : suppression après purge |
 
-## Fichiers non suivis par git
+## Fichiers non commités
 
-Sans `--to`, la cible est le workspace tel qu'il est sur le disque, comme pour `sf project deploy start` : en plus de
-`git diff <from>`, les fichiers jamais ajoutés à git (`git ls-files --others --exclude-standard`) entrent dans le delta
-comme des ajouts. Les fichiers exclus par `.gitignore` restent dehors. Entre deux refs (`--to`), seul l'historique git
-compte.
+`--to` vaut `HEAD` par défaut, comme dans sfdx-git-delta : seul l'historique git compte. Les fichiers modifiés ou non
+suivis du `--source-dir` restent hors du delta, et un warning les compte. Écart volontaire avec `sfdx mdt:git:delta`,
+qui copiait les fichiers du disque quel que soit `--to` : le package mélangeait alors la liste d'une ref et le contenu
+d'une autre.
 
 ## Fichiers qui ne sont pas des metadata
 

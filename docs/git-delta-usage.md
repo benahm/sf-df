@@ -14,7 +14,7 @@ sf df git delta --from main --to feature/my-branch --deploy-dir delta/deploy --d
 ## Flags
 
 - `--from`, `-f` : ref git de départ.
-- `--to`, `-t` : ref git de fin. Si absent, le workspace courant est utilisé.
+- `--to`, `-t` : ref git de fin. Défaut : `HEAD`. Le contenu est lu dans git, jamais sur le disque : les modifications non commitées sont ignorées, avec un warning qui les compte.
 - `--deploy-dir`, `-d` : dossier du package à déployer (alias déprécié : `--packagedir`).
 - `--destructive-dir` : dossier des suppressions (alias déprécié : `--descructivedir`). Par défaut `<deploy-dir>-destructive`, à côté du dossier à déployer. Aucun des deux ne peut être dans l'autre.
 - `--source-dir`, `-s` : dossier source metadata. Défaut : `force-app/main/default`.

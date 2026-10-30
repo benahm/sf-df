@@ -4,7 +4,7 @@
 
 La commande [`src/commands/df/git/delta.ts`](../src/commands/df/git/delta.ts) orchestre un pipeline simple :
 
-1. lire le diff git entre `--from` et `--to` ou le workspace courant ;
+1. lire le diff git entre `--from` et `--to` (`HEAD` par défaut) ;
 2. matérialiser les snapshots nécessaires ;
 3. transformer chaque changement en opération `package` ou `destructive` ;
 4. résoudre une fois le metadata concerné ;
@@ -18,14 +18,15 @@ Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
 ### `git.ts`
 
 - Exécute `git diff --name-status -M`.
-- Sans `--to`, ajoute les fichiers non suivis (`git ls-files --others --exclude-standard`) comme des ajouts : le
-  workspace est pris tel qu'il est sur le disque.
+- La commande passe toujours `--to` (`HEAD` par défaut). Le moteur garde un mode sans `to` (workspace sur le disque,
+  fichiers non suivis ajoutés via `git ls-files --others --exclude-standard`), utilisé par les tests.
+- `getUncommittedFiles` compte ce qu'un delta vers `HEAD` laisse de côté (warning de la commande).
 - Normalise les statuts en `add`, `modify`, `delete`, `rename`.
 - Travaille avec `core.quotePath=false` pour garder des chemins lisibles.
 
 ### `snapshot.ts`
 
-- Crée un snapshot git temporaire pour `--from` et éventuellement `--to`, les deux en parallèle.
+- Crée un snapshot git temporaire pour `--from` et `--to`, les deux en parallèle.
 - N'extrait que les composants des fichiers changés (`componentScope`) : le dossier entier d'un objet, d'un bundle
   ou d'un dossier de reports, ou un fichier avec son `-meta.xml` (`classes/Foo.cls` et `Foo.cls-meta.xml`, pas
   `FooBar.cls`). Les deux côtés reçoivent les mêmes composants : un renommage ou la suppression d'un fichier de bundle
@@ -34,7 +35,7 @@ Le coeur est dans [`src/delta/engine.ts`](../src/delta/engine.ts).
   (`update-index --index-info`) et un seul `checkout-index`. Extraire tout `sourceDir` prenait plus d'une minute par
   snapshot sur Windows pour un gros projet.
 - Si un fichier changé n'est dans aucun dossier de type du registre SDR, tout `sourceDir` est extrait, comme avant.
-- Réutilise directement le workspace si `--to` n'est pas fourni.
+- Réutilise directement le workspace quand le moteur est appelé sans `to` (tests).
 - Nettoie les répertoires temporaires en fin de traitement.
 
 ### `metadata-resolver.ts`

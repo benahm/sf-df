@@ -33,8 +33,8 @@ The plugin is not signed by Salesforce, so `sf` asks you to confirm the installa
 Run the command from the root of the git repository:
 
 ```bash
-# Delta between the last commit and the current workspace
-sf df git delta --from HEAD --deploy-dir delta/deploy
+# Delta of the last commit (--to defaults to HEAD)
+sf df git delta --from HEAD~1 --deploy-dir delta/deploy
 
 # Delta between two refs, choosing where the destructive changes go
 sf df git delta --from main --to feature/my-branch --deploy-dir delta/deploy --destructive-dir delta/destructive
@@ -43,7 +43,7 @@ sf df git delta --from main --to feature/my-branch --deploy-dir delta/deploy --d
 | Flag | Description |
 | --- | --- |
 | `-f, --from` | Starting git ref (commit, branch, tag). **Required.** |
-| `-t, --to` | Target git ref. Defaults to the current workspace, files not added to git included. |
+| `-t, --to` | Target git ref. Defaults to `HEAD`. Files are read from git, never from disk: uncommitted changes are left out, with a warning that counts them (unlike `sfdx mdt:git:delta`, which copied the files on disk). |
 | `-d, --deploy-dir` | Folder of the package to deploy. **Required.** |
 | `--destructive-dir` | Folder of the destructive changes. Defaults to `<deploy-dir>-destructive`, next to the deploy folder. Neither folder can be inside the other. |
 | `-s, --source-dir` | Metadata folder to inspect. Defaults to `force-app/main/default`. |
@@ -67,7 +67,7 @@ delta/destructive/                   # --destructive-dir
 The terminal shows each component of the delta, what happens to it in the org and the git files behind it:
 
 ```text
-🔍 Delta HEAD → working tree (force-app/main/default)
+🔍 Delta HEAD~1 → HEAD (force-app/main/default)
 13 changed files: 3 added, 4 modified, 5 deleted, 1 renamed.
 
 📦 Deploy · 7 components → delta/deploy/package.xml
@@ -481,7 +481,7 @@ FLAGS
   -d, --deploy-dir=<value>       (required) Directory where the package to deploy is generated.
   -f, --from=<value>             (required) Git ref used as the starting point.
   -s, --source-dir=<value>       [default: force-app/main/default] Metadata source directory to inspect.
-  -t, --to=<value>               Git ref used as the target point.
+  -t, --to=<value>               [default: HEAD] Git ref used as the target point.
       --destructive-dir=<value>  Directory where the destructive changes are generated.
 
 GLOBAL FLAGS
@@ -505,7 +505,7 @@ DESCRIPTION
   Run the command from the root of the git repository.
 
 EXAMPLES
-  Generate a delta against the current workspace:
+  Generate the delta of the last commit:
 
     $ sf df git delta --from HEAD~1 --deploy-dir delta/deploy
 
@@ -536,8 +536,9 @@ FLAG DESCRIPTIONS
 
   -t, --to=<value>  Git ref used as the target point.
 
-    Optional commit, tag, or branch used as the target snapshot. If omitted, the current workspace is used as it is on
-    disk, including files not added to git yet (files excluded by .gitignore are left out).
+    Commit, tag, or branch used as the target snapshot. Defaults to HEAD: files are read from git, never from disk, so
+    uncommitted changes are left out (a warning counts them). Unlike sfdx mdt:git:delta, which copied the files on disk
+    whatever --to was.
 
   --destructive-dir=<value>  Directory where the destructive changes are generated.
 
