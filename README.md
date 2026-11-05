@@ -395,6 +395,7 @@ Documentation:
 * [`sf df git merge-driver install`](#sf-df-git-merge-driver-install)
 * [`sf df git merge-driver run`](#sf-df-git-merge-driver-run)
 * [`sf df git merge-driver uninstall`](#sf-df-git-merge-driver-uninstall)
+* [`sf df git merge-preview`](#sf-df-git-merge-preview)
 * [`sf df org align`](#sf-df-org-align)
 * [`sf df org changes`](#sf-df-org-changes)
 * [`sf df org map`](#sf-df-org-map)
@@ -483,7 +484,7 @@ FLAG DESCRIPTIONS
     left unchanged.
 ```
 
-_See code: [src/commands/df/deploy.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/deploy.ts)_
+_See code: [src/commands/df/deploy.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/deploy.ts)_
 
 ## `sf df git delta`
 
@@ -564,7 +565,7 @@ FLAG DESCRIPTIONS
     be inside the deploy directory, or the other way round. Replaces --descructivedir of sfdx mdt:git:delta.
 ```
 
-_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/git/delta.ts)_
+_See code: [src/commands/df/git/delta.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/git/delta.ts)_
 
 ## `sf df git merge-driver install`
 
@@ -600,7 +601,7 @@ EXAMPLES
     $ sf df git merge-driver install
 ```
 
-_See code: [src/commands/df/git/merge-driver/install.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/git/merge-driver/install.ts)_
+_See code: [src/commands/df/git/merge-driver/install.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/git/merge-driver/install.ts)_
 
 ## `sf df git merge-driver run`
 
@@ -644,7 +645,7 @@ FLAG DESCRIPTIONS
     Receives the merged result.
 ```
 
-_See code: [src/commands/df/git/merge-driver/run.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/git/merge-driver/run.ts)_
+_See code: [src/commands/df/git/merge-driver/run.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/git/merge-driver/run.ts)_
 
 ## `sf df git merge-driver uninstall`
 
@@ -670,7 +671,65 @@ EXAMPLES
     $ sf df git merge-driver uninstall
 ```
 
-_See code: [src/commands/df/git/merge-driver/uninstall.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/git/merge-driver/uninstall.ts)_
+_See code: [src/commands/df/git/merge-driver/uninstall.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/git/merge-driver/uninstall.ts)_
+
+## `sf df git merge-preview`
+
+Merge a branch into another without merging: compute the merge commit, or list the conflicts.
+
+```
+USAGE
+  $ sf df git merge-preview -f <value> -i <value> [--json] [--flags-dir <value>] [-m <value>]
+
+FLAGS
+  -f, --from=<value>     (required) Branch or commit to merge.
+  -i, --into=<value>     (required) Branch or commit it is merged into.
+  -m, --message=<value>  Message of the merge commit. Default: "Merge <from> into <into>".
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Merge a branch into another without merging: compute the merge commit, or list the conflicts.
+
+  The virtual merge of sf df deploy, on its own. git merge-tree merges --from into --into with the XML merge driver of
+  sf df git merge-driver (container metadata merged by key), then git commit-tree wraps the result in a merge commit.
+  Nothing is checked out, no branch moves, nothing is pushed: the commit only exists in the local repository.
+
+  Use it to build your own delivery pipeline: compute the delta of the merge with sf df git delta --from <into> --to
+  <commit>, deploy it with sf project deploy start, then push the commit to the target branch (git push <remote>
+  <commit>:refs/heads/<branch>), fast-forward only.
+
+  --from and --into are used as they are, nothing is fetched: run git fetch first and pass the remote branches
+  (origin/<branch>). When --from is already merged into --into, the commit is the tip of --into. When the branches
+  conflict, the files are listed and the command exits with code 1.
+
+  .gitattributes is read from --into: the repository needs no sf df git merge-driver install, but sf must be in the
+  PATH. Requires git 2.40 or later.
+
+EXAMPLES
+  Merge feature/JIRA-123 into int without touching any branch:
+  git fetch origin
+  $ sf df git merge-preview --from origin/feature/JIRA-123 --into origin/int
+
+  Your own delivery: merge, delta, deploy, then push only when the deployment succeeded:
+  M=$(sf df git merge-preview -f origin/feature/JIRA-123 -i origin/int --json | jq -r .result.commit)
+  $ sf df git delta --from origin/int --to $M --deploy-dir delta
+  $ sf project deploy start --source-dir delta/force-app
+  git push origin $M:refs/heads/int
+
+FLAG DESCRIPTIONS
+  -f, --from=<value>  Branch or commit to merge.
+
+    Any git ref: origin/feature/JIRA-123, a local branch, a sha, refs/pull/42/head...
+
+  -i, --into=<value>  Branch or commit it is merged into.
+
+    Usually the remote branch of an environment: origin/int. It becomes the first parent of the merge commit.
+```
+
+_See code: [src/commands/df/git/merge-preview.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/git/merge-preview.ts)_
 
 ## `sf df org align`
 
@@ -730,7 +789,7 @@ FLAG DESCRIPTIONS
     delta.
 ```
 
-_See code: [src/commands/df/org/align.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/org/align.ts)_
+_See code: [src/commands/df/org/align.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/org/align.ts)_
 
 ## `sf df org changes`
 
@@ -822,7 +881,7 @@ FLAG DESCRIPTIONS
     Without --since, the 20 latest changes are listed. With it, every change since the date, unless --limit is set.
 ```
 
-_See code: [src/commands/df/org/changes.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/org/changes.ts)_
+_See code: [src/commands/df/org/changes.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/org/changes.ts)_
 
 ## `sf df org map`
 
@@ -874,7 +933,7 @@ FLAG DESCRIPTIONS
     Adds the org to the mapping, or changes its branch. Fails when the branch is already mapped to another org.
 ```
 
-_See code: [src/commands/df/org/map.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/org/map.ts)_
+_See code: [src/commands/df/org/map.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/org/map.ts)_
 
 ## `sf df profile retrieve`
 
@@ -992,7 +1051,7 @@ FLAG DESCRIPTIONS
     project.
 ```
 
-_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/profile/retrieve.ts)_
+_See code: [src/commands/df/profile/retrieve.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/profile/retrieve.ts)_
 
 ## `sf df profile to-permset`
 
@@ -1066,5 +1125,5 @@ FLAG DESCRIPTIONS
     profile hasn't changed since.
 ```
 
-_See code: [src/commands/df/profile/to-permset.ts](https://github.com/benahm/sf-df/blob/v0.0.7-beta/src/commands/df/profile/to-permset.ts)_
+_See code: [src/commands/df/profile/to-permset.ts](https://github.com/benahm/sf-df/blob/v0.0.8-beta/src/commands/df/profile/to-permset.ts)_
 <!-- commandsstop -->
