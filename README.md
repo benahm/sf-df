@@ -305,6 +305,22 @@ sf df deploy --source feature/JIRA-123 --target-org int
 
 Details: [docs/deploy.md](docs/deploy.md).
 
+## Build your own delivery: `sf df git merge-preview`
+
+The virtual merge of `sf df deploy`, on its own: it computes the merge commit of two branches (or lists the
+conflicts) without checkout, without moving any branch, with the XML merge driver. Combined with `sf df git delta`, it
+lets a team write its own delivery pipeline without `sf df deploy`.
+
+```bash
+git fetch origin
+M=$(sf df git merge-preview --from origin/feature/JIRA-123 --into origin/int --json | jq -r .result.commit)
+sf df git delta --from origin/int --to "$M" --deploy-dir delta
+sf project deploy start --source-dir delta/force-app
+git push origin "$M:refs/heads/int"
+```
+
+Conflicts are listed and the command exits with code 1. Details: [docs/merge-preview.md](docs/merge-preview.md).
+
 ## Migrating from `sfdx mdt:git:delta`
 
 | `sfdx mdt:git:delta` | `sf df git delta` |
@@ -367,6 +383,7 @@ Documentation:
 - [Org align](docs/align.md)
 - [Merge driver](docs/merge-driver.md)
 - [Deploy](docs/deploy.md)
+- [Merge preview](docs/merge-preview.md)
 - [Roadmap](docs/roadmap.md)
 - [Testing](docs/testing.md)
 

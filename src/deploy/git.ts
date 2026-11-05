@@ -70,9 +70,9 @@ const commitEnv = async (cwd: string): Promise<NodeJS.ProcessEnv> => {
 
   return {
     ...process.env,
-    GIT_AUTHOR_NAME: 'sf df deploy',
+    GIT_AUTHOR_NAME: 'sf-df',
     GIT_AUTHOR_EMAIL: 'sf-df@localhost',
-    GIT_COMMITTER_NAME: 'sf df deploy',
+    GIT_COMMITTER_NAME: 'sf-df',
     GIT_COMMITTER_EMAIL: 'sf-df@localhost',
   };
 };

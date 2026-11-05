@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/MergePreviewResult",
+  "definitions": {
+    "MergePreviewResult": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "into": {
+          "type": "string"
+        },
+        "fromCommit": {
+          "type": "string"
+        },
+        "intoCommit": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "alreadyMerged": {
+          "type": "boolean"
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "from",
+        "into",
+        "fromCommit",
+        "intoCommit",
+        "commit",
+        "alreadyMerged",
+        "conflicts"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -180,7 +180,12 @@ Outils d'appoint, utiles seuls. Aucun n'est nécessaire pour livrer : c'est le r
 | `sf df flow clean --target-org int --keep 5` | Supprime les anciennes versions inactives des Flows, garde les N dernières. |
 | `sf df xml normalize` | Tri et formatage stables des XML de metadata, pour réduire les diffs et les conflits après un retrieve. |
 
-`git merge-preview` et `promote` sont retirés : `deploy --dry-run` et `deploy --source` les couvrent.
+`promote` est retiré : `deploy --source` le couvre.
+
+`sf df git merge-preview` is **done** ([merge-preview.md](merge-preview.md)): unlike `deploy --dry-run`, it needs no
+mapped org and returns the merge commit, so that `merge-preview` + `git delta` build a custom delivery. Next, on the
+same virtual merge: `pick-preview` / `revert-preview` (cherry-pick or revert of the commits of a ticket) and
+`git conflicts` (conflict matrix of the open features).
 
 ## Hors périmètre
 

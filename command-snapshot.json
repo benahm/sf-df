@@ -87,6 +87,24 @@
     },
     {
         "alias": [],
+        "command": "df:git:merge-preview",
+        "flagAliases": [],
+        "flagChars": [
+            "f",
+            "i",
+            "m"
+        ],
+        "flags": [
+            "flags-dir",
+            "from",
+            "into",
+            "json",
+            "message"
+        ],
+        "plugin": "sf-df"
+    },
+    {
+        "alias": [],
         "command": "df:org:align",
         "flagAliases": [],
         "flagChars": [
