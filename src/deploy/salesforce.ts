@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import type { Connection, PollingClient } from '@salesforce/core';
-import { ComponentSet, type MetadataApiDeploy } from '@salesforce/source-deploy-retrieve';
+import { ComponentSet, type MetadataApiDeploy, type MetadataApiDeployStatus } from '@salesforce/source-deploy-retrieve';
 
 import { pathExists } from '../delta/fs.js';
 import type { TestPlan } from './tests.js';
@@ -22,6 +22,8 @@ export type DeployOutcome = {
   id?: string;
   success: boolean;
   status: string;
+  // The job was not seen finishing (wait elapsed, connection lost): it may still succeed in the org.
+  pending?: boolean;
   componentFailures: string[];
   testFailures: string[];
   errorMessage?: string;
@@ -31,6 +33,22 @@ export type Deployer = (request: DeployRequest) => Promise<DeployOutcome>;
 
 const asArray = <T>(value: T | T[] | undefined): T[] =>
   value === undefined ? [] : Array.isArray(value) ? value : [value];
+
+const toOutcome = (response: MetadataApiDeployStatus): DeployOutcome => {
+  const details = response.details ?? {};
+  return {
+    id: response.id,
+    success: response.success,
+    status: String(response.status),
+    errorMessage: response.errorMessage,
+    componentFailures: asArray(details.componentFailures).map((failure) =>
+      `${failure.componentType ?? ''}:${failure.fullName} ${failure.problem ?? ''}`.trim()
+    ),
+    testFailures: asArray(details.runTestResult?.failures).map((failure) =>
+      `${failure.name}.${failure.methodName} ${failure.message}`.trim()
+    ),
+  };
+};
 
 // One Metadata API job holds the package and the post-destructive changes: the deployment is atomic, a single
 // rejected component rolls everything back.
@@ -56,28 +74,23 @@ export const metadataApiDeployer =
 
     try {
       const { response } = await deploy.pollStatus({ timeout: request.wait });
-      const details = response.details ?? {};
-      return {
-        id: response.id,
-        success: response.success,
-        status: String(response.status),
-        errorMessage: response.errorMessage,
-        componentFailures: asArray(details.componentFailures).map((failure) =>
-          `${failure.componentType ?? ''}:${failure.fullName} ${failure.problem ?? ''}`.trim()
-        ),
-        testFailures: asArray(details.runTestResult?.failures).map((failure) =>
-          `${failure.name}.${failure.methodName} ${failure.message}`.trim()
-        ),
-      };
+      return toOutcome(response);
     } catch (error) {
-      // Timeout: the job keeps running in the org, its id is enough to follow it.
-      return {
+      // The wait elapsed or polling broke, which says nothing about the job: ask the org once more.
+      const pending: DeployOutcome = {
         id: deploy.id,
         success: false,
+        pending: true,
         status: 'Unknown',
         errorMessage: error instanceof Error ? error.message : String(error),
         componentFailures: [],
         testFailures: [],
       };
+      try {
+        const response = await deploy.checkStatus();
+        return response.done ? toOutcome(response) : { ...pending, status: String(response.status) };
+      } catch {
+        return pending;
+      }
     }
   };

@@ -134,7 +134,37 @@ export const pushCommit = async (cwd: string, remote: string, commit: string, br
   await run(cwd, ['push', '--porcelain', remote, `${commit}:refs/heads/${branch}`]);
 };
 
-export const listFiles = async (cwd: string, commit: string, directory: string): Promise<string[]> => {
-  const output = await run(cwd, ['ls-tree', '-r', '--name-only', commit, '--', directory]);
-  return output === '' ? [] : output.split('\n');
+// Files of `directory` at `commit` that hold an Apex test: the @isTest annotation, or the legacy testMethod keyword.
+// One git process, whatever the size of the project.
+export const listTestFiles = async (cwd: string, commit: string, directory: string): Promise<string[]> => {
+  let output: string;
+  try {
+    output = await run(cwd, [
+      'grep',
+      '-z',
+      '--name-only',
+      '-i',
+      '-w',
+      '-e',
+      '@istest',
+      '-e',
+      'testmethod',
+      commit,
+      '--',
+      directory,
+    ]);
+  } catch (error) {
+    // Exit code 1: no file matches.
+    if ((error as { code?: unknown }).code === 1) {
+      return [];
+    }
+
+    throw error;
+  }
+
+  // Each entry is "<commit>:<path>".
+  return output
+    .split('\0')
+    .filter(Boolean)
+    .map((entry) => entry.slice(commit.length + 1));
 };

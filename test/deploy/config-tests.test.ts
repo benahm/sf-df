@@ -61,22 +61,31 @@ describe('deploy configuration', () => {
 });
 
 describe('deploy test selection', () => {
-  const existing = ['Invoice', 'InvoiceTest', 'Order', 'Order_Test', 'Report', 'TestDataFactory'];
+  // The classes annotated @isTest, whatever their name.
+  const testClasses = ['InvoiceTest', 'Order_Test', 'TestDataFactory', 'LatestServiceTest', 'InvoiceTriggerTest'];
 
   it('runs the tests named after the deployed classes, and the deployed test classes', () => {
-    expect(selectTests(['Invoice', 'Order', 'Report', 'TestDataFactory'], existing)).to.deep.equal([
+    expect(selectTests(['Invoice', 'Order', 'Report', 'TestDataFactory'], testClasses)).to.deep.equal([
       'InvoiceTest',
       'Order_Test',
       'TestDataFactory',
     ]);
   });
 
+  it('does not take a class for a test because its name contains "test"', () => {
+    expect(selectTests(['LatestService', 'Contest'], testClasses)).to.deep.equal(['LatestServiceTest']);
+  });
+
+  it('runs the test named after a deployed trigger', () => {
+    expect(selectTests(['InvoiceTrigger'], testClasses)).to.deep.equal(['InvoiceTriggerTest']);
+  });
+
   it('runs no test when none matches, unless a level is requested', () => {
-    expect(planTests(['Report'], existing)).to.deep.equal({ testLevel: 'NoTestRun', tests: [] });
-    expect(planTests(['Report'], existing, 'RunLocalTests')).to.deep.equal({
+    expect(planTests(['Report'], testClasses)).to.deep.equal({ testLevel: 'NoTestRun', tests: [] });
+    expect(planTests(['Report'], testClasses, 'RunLocalTests')).to.deep.equal({
       testLevel: 'RunLocalTests',
       tests: [],
     });
-    expect(() => planTests(['Report'], existing, 'RunSpecifiedTests')).to.throw('no test class matches');
+    expect(() => planTests(['Report'], testClasses, 'RunSpecifiedTests')).to.throw('no test class matches');
   });
 });

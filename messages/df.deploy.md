@@ -8,7 +8,7 @@ Each org is linked to one branch in sfdx-project.json ("plugins.sfdf.orgs", the 
 
 The command fetches the org's branch and --source, merges them without checking anything out (git merge-tree, with the XML merge driver of sf df git merge-driver), computes the delta between the branch tip and the merge, and deploys it in a single atomic job: package, deletions and partial XML together. When the deployment succeeds, the merge is pushed to the branch, fast-forward only. When it fails, nothing is pushed: the branch still matches the org and the command can simply run again.
 
-A deployment that deletes components requires --allow-destructive. Without --test-level, the tests are the classes named after the deployed Apex classes (<Class>Test, <Class>_Test), or none.
+A deployment that deletes components requires --allow-destructive. Without --test-level, the tests are the test classes (@isTest) named after the deployed Apex classes and triggers (<Name>Test, <Name>_Test), plus the deployed test classes, or none.
 
 Requires git 2.40 or later.
 
@@ -50,11 +50,11 @@ Deployment test level.
 
 # flags.test-level.description
 
-Without this flag, RunSpecifiedTests with the test classes matching the deployed Apex classes, or NoTestRun when none matches. RunSpecifiedTests alone fails when no test class matches.
+Without this flag, RunSpecifiedTests with the test classes (@isTest) matching the deployed Apex classes and triggers, or NoTestRun when none matches. RunSpecifiedTests alone fails when no test class matches.
 
 # flags.wait.summary
 
-Number of minutes to wait for the deployment. Past this delay, the job keeps running in the org.
+Number of minutes to wait for the deployment. Past this delay, the job keeps running in the org and nothing is pushed.
 
 # spinner.start
 

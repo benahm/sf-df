@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "docs",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["website/node_modules/@docusaurus/core/bin/docusaurus.mjs", "serve", "website", "--port", "3210", "--no-open"],
+      "port": 3210
+    }
+  ]
+}

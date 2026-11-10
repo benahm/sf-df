@@ -14,18 +14,17 @@ export const apexClassName = (filePath: string): string | undefined => {
   return base.endsWith(CLASS_SUFFIX) ? base.slice(0, -CLASS_SUFFIX.length) : undefined;
 };
 
-const looksLikeTest = (className: string): boolean => /test/i.test(className);
-
-// Naming convention: a deployed class is covered by `<Class>Test` or `<Class>_Test`, and a deployed test class runs
-// itself. Only classes that exist in the deployed tree are kept, so a convention miss never fails the deployment.
-export const selectTests = (deployedClasses: Iterable<string>, existingClasses: Iterable<string>): string[] => {
-  const existing = new Map([...existingClasses].map((name) => [name.toLowerCase(), name]));
+// Naming convention: a deployed class or trigger is covered by `<Name>Test` or `<Name>_Test`, and a deployed test
+// class runs itself. `testClasses` are the classes of the deployed tree that are really tests (@isTest), never
+// guessed from their name: `LatestService` or `Contest` are not tests. Only those are kept, so a convention miss
+// never fails the deployment.
+export const selectTests = (deployedApex: Iterable<string>, testClasses: Iterable<string>): string[] => {
+  const tests = new Map([...testClasses].map((name) => [name.toLowerCase(), name]));
   const selected = new Set<string>();
 
-  for (const className of deployedClasses) {
-    const candidates = looksLikeTest(className) ? [className] : [`${className}Test`, `${className}_Test`];
-    for (const candidate of candidates) {
-      const match = existing.get(candidate.toLowerCase());
+  for (const name of deployedApex) {
+    for (const candidate of [name, `${name}Test`, `${name}_Test`]) {
+      const match = tests.get(candidate.toLowerCase());
       if (match) {
         selected.add(match);
       }
@@ -35,17 +34,18 @@ export const selectTests = (deployedClasses: Iterable<string>, existingClasses: 
   return [...selected].sort();
 };
 
-// Without --test-level: the tests of the deployed classes, or none when no test matches (sandboxes don't require any).
+// Without --test-level: the tests of the deployed classes and triggers, or none when no test matches (sandboxes
+// don't require any).
 export const planTests = (
-  deployedClasses: Iterable<string>,
-  existingClasses: Iterable<string>,
+  deployedApex: Iterable<string>,
+  testClasses: Iterable<string>,
   requested?: TestLevel
 ): TestPlan => {
   if (requested && requested !== 'RunSpecifiedTests') {
     return { testLevel: requested, tests: [] };
   }
 
-  const tests = selectTests(deployedClasses, existingClasses);
+  const tests = selectTests(deployedApex, testClasses);
   if (tests.length > 0) {
     return { testLevel: 'RunSpecifiedTests', tests };
   }

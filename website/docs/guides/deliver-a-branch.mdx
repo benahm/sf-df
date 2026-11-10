@@ -38,8 +38,9 @@ A merge that touches no metadata (README, CI files) is pushed without deploying 
 | Check the deployment in the org without changing it, in a pull request pipeline | `--validate` |
 | Choose the tests | `--test-level` |
 
-Without `--test-level`, the tests are the classes named after the deployed Apex classes (`InvoiceTest` and
-`Invoice_Test` for `Invoice`) plus the deployed test classes themselves. When none matches, no test runs, which
+Without `--test-level`, the tests are the classes named after the deployed Apex classes and triggers (`InvoiceTest` and
+`Invoice_Test` for `Invoice`) plus the deployed test classes themselves. A test class is recognised by its `@isTest`
+annotation, not by its name. When none matches, no test runs, which
 sandboxes accept.
 
 ## Deletions

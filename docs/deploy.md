@@ -80,10 +80,11 @@ Un merge qui ne touche aucune metadata (README, CI...) est poussé sans déploie
 | `--from <ref>` | Point de départ du delta à la place de la branche de l'org (refresh, premier déploiement). |
 | `--allow-destructive` | Obligatoire dès que le delta supprime des composants (sauf en `--validate`). |
 | `--test-level`, `-l` | `NoTestRun`, `RunSpecifiedTests`, `RunLocalTests`, `RunAllTestsInOrg`. |
-| `--wait`, `-w` | Minutes d'attente (défaut 60). Au-delà, le job continue dans l'org. |
+| `--wait`, `-w` | Minutes d'attente (défaut 60). Au-delà, le job continue dans l'org : rien n'est poussé, et l'erreur dit comment suivre le job puis rattraper la branche s'il réussit. |
 
-Tests, sans `--test-level` : les classes `<Classe>Test` et `<Classe>_Test` des classes Apex déployées, et les classes de
-test déployées elles-mêmes. Aucune trouvée : `NoTestRun`.
+Tests, sans `--test-level` : les classes `<Nom>Test` et `<Nom>_Test` des classes et triggers Apex déployés, et les classes de
+test déployées elles-mêmes. Une classe de test est reconnue à son annotation `@isTest`, pas à son nom. Aucune trouvée :
+`NoTestRun`.
 
 ## Quand la branche et l'org se décalent
 

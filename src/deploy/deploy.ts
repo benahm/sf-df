@@ -11,7 +11,7 @@ import { findOrgConfig, type DeployConfig } from './config.js';
 import {
   fetchBranch,
   fetchSource,
-  listFiles,
+  listTestFiles,
   pushCommit,
   resolveCommit,
   virtualMerge,
@@ -84,6 +84,8 @@ const describeFailure = (outcome: DeployOutcome): string =>
     .filter(Boolean)
     .join('\n');
 
+const APEX_PREFIXES = ['ApexClass:', 'ApexTrigger:'];
+
 const planTestsOf = async (
   repoRoot: string,
   commit: string,
@@ -91,11 +93,32 @@ const planTestsOf = async (
   components: string[],
   requested?: TestLevel
 ): Promise<TestPlan> => {
-  const deployedClasses = components.filter((entry) => entry.startsWith('ApexClass:')).map((entry) => entry.slice(10));
-  const existingClasses = (await listFiles(repoRoot, commit, sourceDir))
+  const deployedApex = components.flatMap((entry) => {
+    const prefix = APEX_PREFIXES.find((candidate) => entry.startsWith(candidate));
+    return prefix ? [entry.slice(prefix.length)] : [];
+  });
+  const testClasses = (await listTestFiles(repoRoot, commit, sourceDir))
     .map(apexClassName)
     .filter((name): name is string => name !== undefined);
-  return planTests(deployedClasses, existingClasses, requested);
+  return planTests(deployedApex, testClasses, requested);
+};
+
+// The wait is over, or the connection dropped: the job may still succeed in the org, so this is not a failure.
+const unknownOutcomeError = (outcome: DeployOutcome, options: DeployBranchOptions, branch: string): SfError => {
+  const job = outcome.id ?? 'unknown';
+  const reason = outcome.errorMessage ? `\n${outcome.errorMessage}` : '';
+  const follow = `Follow the job: sf project deploy report --job-id ${job}`;
+  return new SfError(
+    `The outcome of the deployment is unknown (job ${job}, status ${outcome.status}): it may still be running in the org. Nothing was pushed.${reason}`,
+    NAME,
+    options.validate
+      ? [follow]
+      : [
+          follow,
+          `If it succeeds, the org is ahead of ${branch}: run the command again for ${options.source}. It is redeployed (already in the org, harmless) and pushed.`,
+          `If it fails, ${branch} still matches the org: fix ${options.source} and run the command again.`,
+        ]
+  );
 };
 
 const branchOf = (config: DeployConfig, orgUrl: string): string => {
@@ -266,6 +289,10 @@ export const deployBranch = async (options: DeployBranchOptions): Promise<Deploy
       wait: options.wait,
     });
     result.deployId = outcome.id;
+
+    if (outcome.pending) {
+      throw unknownOutcomeError(outcome, options, branch);
+    }
 
     if (!outcome.success) {
       const job = outcome.id ? ` (job ${outcome.id})` : '';

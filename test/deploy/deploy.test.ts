@@ -166,6 +166,40 @@ describe('deploy', () => {
     expect(remoteTip(repo, 'int')).to.equal(base);
   });
 
+  it('does not call a deployment still running a failure: the org may end up ahead of the branch', async () => {
+    const base = remoteTip(repo, 'int');
+    const { deployer } = fakeDeployer({ success: false, pending: true, status: 'InProgress' });
+
+    let error: (Error & { actions?: string[] }) | undefined;
+    try {
+      await deployBranch(options({ deployer }));
+    } catch (caught) {
+      error = caught as Error & { actions?: string[] };
+    }
+
+    expect(error?.message).to.contain('outcome of the deployment is unknown').and.to.contain('0Af000000000001');
+    expect(error?.message).to.not.contain('still matches the org');
+    expect(error?.actions?.join('\n')).to.contain('run the command again');
+    expect(remoteTip(repo, 'int')).to.equal(base);
+  });
+
+  it('selects the tests from the @isTest annotation, not from the name of the class', async () => {
+    // "Latest" contains "test" but is not a test; its test is LatestTest.
+    git(repo.dev, ['checkout', '-q', 'feature/b']);
+    await write(repo.dev, `${SOURCE}/classes/Latest.cls`, 'public class Latest {}\n');
+    await write(repo.dev, `${SOURCE}/classes/Latest.cls-meta.xml`, classMeta);
+    await write(repo.dev, `${SOURCE}/classes/LatestTest.cls`, '@isTest\nprivate class LatestTest {}\n');
+    await write(repo.dev, `${SOURCE}/classes/LatestTest.cls-meta.xml`, classMeta);
+    commitAll(repo.dev, 'latest');
+    git(repo.dev, ['push', '-q', 'origin', 'feature/b']);
+    git(repo.dev, ['checkout', '-q', 'int']);
+
+    const result = await deployBranch(options({ deployer: fakeDeployer().deployer, dryRun: true }));
+
+    expect(result.components).to.deep.equal(['ApexClass:Invoice', 'ApexClass:Latest', 'ApexClass:LatestTest']);
+    expect(result.tests).to.deep.equal(['InvoiceTest', 'LatestTest']);
+  });
+
   it('stops on a conflict without deploying', async () => {
     await write(repo.dev, `${SOURCE}/classes/Invoice.cls`, 'public class Invoice { String name; }\n');
     commitAll(repo.dev, 'other change on int');
