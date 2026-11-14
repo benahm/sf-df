@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { DRIVER_COMMAND, DRIVER_NAME } from '../merge/install.js';
@@ -167,4 +167,152 @@ export const listTestFiles = async (cwd: string, commit: string, directory: stri
     .split('\0')
     .filter(Boolean)
     .map((entry) => entry.slice(commit.length + 1));
+};
+
+// Keeps the command line short, whatever the number of names (Windows limits it to 32k characters).
+const NAMES_PER_GREP = 200;
+
+// For each of `names` (lowercased), the files of `files` that mention it as a whole word, at `commit`: the test
+// classes that use a class. A mention in a comment or a string counts too: an extra test runs, none is missed.
+export const listReferences = async (
+  cwd: string,
+  commit: string,
+  directory: string,
+  files: readonly string[],
+  names: readonly string[]
+): Promise<Map<string, string[]>> => {
+  const wanted = new Set(files);
+  const references = new Map<string, Set<string>>();
+  if (wanted.size === 0) {
+    return new Map();
+  }
+
+  const chunks: string[][] = [];
+  for (let index = 0; index < names.length; index += NAMES_PER_GREP) {
+    chunks.push(names.slice(index, index + NAMES_PER_GREP));
+  }
+
+  const outputs = await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        return await run(cwd, [
+          'grep',
+          '-z',
+          '--only-matching',
+          '-i',
+          '-w',
+          '-F',
+          ...chunk.flatMap((name) => ['-e', name]),
+          commit,
+          '--',
+          `:(glob)${directory}/**/*.cls`,
+        ]);
+      } catch (error) {
+        // Exit code 1: no file matches.
+        if ((error as { code?: unknown }).code === 1) {
+          return '';
+        }
+
+        throw error;
+      }
+    })
+  );
+
+  // Each line is "<commit>:<path>\0<match>".
+  for (const line of outputs.flatMap((output) => output.split('\n'))) {
+    const [entry, match] = line.split('\0');
+    const file = entry.slice(commit.length + 1);
+    if (match && wanted.has(file)) {
+      const name = match.toLowerCase();
+      references.set(name, (references.get(name) ?? new Set()).add(file));
+    }
+  }
+
+  return new Map([...references].map(([name, found]) => [name, [...found]]));
+};
+
+// Reads `files` at `commit` in one git process (`git cat-file --batch`), whatever their number.
+export const readFilesAt = async (
+  cwd: string,
+  commit: string,
+  files: readonly string[]
+): Promise<Map<string, string>> => {
+  const contents = new Map<string, string>();
+  if (files.length === 0) {
+    return contents;
+  }
+
+  const output = await new Promise<Buffer>((resolve, reject) => {
+    const child = spawn('git', ['cat-file', '--batch'], { cwd });
+    const chunks: Buffer[] = [];
+    child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+    child.on('error', reject);
+    child.on('close', (code) =>
+      code === 0 ? resolve(Buffer.concat(chunks)) : reject(new Error(`git cat-file exited with code ${String(code)}`))
+    );
+    child.stdin.end(files.map((file) => `${commit}:${file}\n`).join(''));
+  });
+
+  // Each object is "<sha> <type> <size>\n<content>\n", or "<name> missing\n".
+  let offset = 0;
+  for (const file of files) {
+    const headerEnd = output.indexOf(0x0a, offset);
+    if (headerEnd === -1) {
+      break;
+    }
+
+    const header = output.subarray(offset, headerEnd).toString('utf8');
+    offset = headerEnd + 1;
+    const size = Number(header.split(' ')[2]);
+    if (header.endsWith(' missing') || Number.isNaN(size)) {
+      continue;
+    }
+
+    contents.set(file, output.subarray(offset, offset + size).toString('utf8'));
+    offset += size + 1;
+  }
+
+  return contents;
+};
+
+// The files of `files` that contain one of `words` (whole word, any case) at `commit`: few files to read afterwards.
+export const filesMentioning = async (
+  cwd: string,
+  commit: string,
+  directory: string,
+  files: readonly string[],
+  words: readonly string[]
+): Promise<string[]> => {
+  const wanted = new Set(files);
+  if (wanted.size === 0) {
+    return [];
+  }
+
+  let output: string;
+  try {
+    output = await run(cwd, [
+      'grep',
+      '-z',
+      '--name-only',
+      '-i',
+      '-w',
+      ...words.flatMap((word) => ['-e', word]),
+      commit,
+      '--',
+      `:(glob)${directory}/**/*.cls`,
+    ]);
+  } catch (error) {
+    // Exit code 1: no file matches.
+    if ((error as { code?: unknown }).code === 1) {
+      return [];
+    }
+
+    throw error;
+  }
+
+  return output
+    .split('\0')
+    .filter(Boolean)
+    .map((entry) => entry.slice(commit.length + 1))
+    .filter((file) => wanted.has(file));
 };

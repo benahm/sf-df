@@ -8,7 +8,7 @@ Each org is linked to one branch in sfdx-project.json ("plugins.sfdf.orgs", the 
 
 The command fetches the org's branch and --source, merges them without checking anything out (git merge-tree, with the XML merge driver of sf df git merge-driver), computes the delta between the branch tip and the merge, and deploys it in a single atomic job: package, deletions and partial XML together. When the deployment succeeds, the merge is pushed to the branch, fast-forward only. When it fails, nothing is pushed: the branch still matches the org and the command can simply run again.
 
-A deployment that deletes components requires --allow-destructive. Without --test-level, the tests are the test classes (@isTest) named after the deployed Apex classes and triggers (<Name>Test, <Name>_Test), plus the deployed test classes, or none.
+A deployment that deletes components requires --allow-destructive. Use --tests to choose the Apex tests explicitly. Without --tests or --test-level, the tests are the test classes (@isTest) named after the deployed Apex classes and triggers (<Name>Test, <Name>_Test), mentioning them or declaring them in @IsTest(testFor=...), the @IsTest(critical=true) test classes, plus the deployed test classes, or none.
 
 Requires git 2.40 or later.
 
@@ -50,7 +50,15 @@ Deployment test level.
 
 # flags.test-level.description
 
-Without this flag, RunSpecifiedTests with the test classes (@isTest) matching the deployed Apex classes and triggers, or NoTestRun when none matches. RunSpecifiedTests alone fails when no test class matches.
+Without --tests, the default is RunSpecifiedTests with the matching Apex test classes, or NoTestRun when none matches. Explicitly requesting RunSpecifiedTests without --tests requires at least one match.
+
+# flags.tests.summary
+
+Apex tests to run explicitly.
+
+# flags.tests.description
+
+List test names separated by spaces or repeat --tests for each name. This flag selects RunSpecifiedTests automatically. If you also supply --test-level, it must be RunSpecifiedTests.
 
 # flags.wait.summary
 
@@ -114,6 +122,10 @@ Deletions:
 - Validate a feature in a pull request pipeline:
 
   <%= config.bin %> <%= command.id %> --source feature/JIRA-123 --target-org int --validate
+
+- Deploy and run specific Apex tests.
+
+  <%= config.bin %> <%= command.id %> --source feature/JIRA-123 --target-org int --tests InvoiceTest OrderTest
 
 - Redeploy after a sandbox refresh, the sandbox now holding production:
 

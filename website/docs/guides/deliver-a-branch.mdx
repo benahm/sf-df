@@ -36,12 +36,20 @@ A merge that touches no metadata (README, CI files) is pushed without deploying 
 | --- | --- |
 | See the merge, the delta and the tests, without deploying or pushing | `--dry-run` |
 | Check the deployment in the org without changing it, in a pull request pipeline | `--validate` |
-| Choose the tests | `--test-level` |
+| Choose the test level | `--test-level` |
+| Run specific Apex tests | `--tests InvoiceTest OrderTest` |
 
-Without `--test-level`, the tests are the classes named after the deployed Apex classes and triggers (`InvoiceTest` and
-`Invoice_Test` for `Invoice`) plus the deployed test classes themselves. A test class is recognised by its `@isTest`
-annotation, not by its name. When none matches, no test runs, which
+Without `--tests` or `--test-level`, the tests are the classes named after the deployed Apex classes and triggers (`InvoiceTest` and
+`Invoice_Test` for `Invoice`), the test classes that mention them whatever their name (`MonthEndChecks` calling
+`Invoice`), the test classes that declare them in `@IsTest(testFor='ApexClass:Invoice')`, the `@IsTest(critical=true)`
+test classes whenever Apex is deployed, plus the deployed test classes themselves. `testFor` and `critical` are the
+annotations Salesforce reads for the `RunRelevantTests` test level (API 66.0), so the links declared today keep working
+when that level replaces the local selection. A test class is recognised by its `@isTest`
+annotation, not by its name, and is looked for in the whole project as it will be after the merge. A warning names the
+deployed classes and triggers no test was found for. When none matches, no test runs, which
 sandboxes accept.
+
+Use `--tests` with space-separated test names, or repeat the flag. It selects `RunSpecifiedTests` automatically.
 
 ## Deletions
 

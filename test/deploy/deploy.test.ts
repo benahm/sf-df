@@ -200,6 +200,76 @@ describe('deploy', () => {
     expect(result.tests).to.deep.equal(['InvoiceTest', 'LatestTest']);
   });
 
+  it('selects the test classes that mention a deployed class, and warns about a class without test', async () => {
+    git(repo.dev, ['checkout', '-q', 'feature/b']);
+    await write(repo.dev, `${SOURCE}/classes/Billing.cls`, 'public class Billing {}\n');
+    await write(repo.dev, `${SOURCE}/classes/Billing.cls-meta.xml`, classMeta);
+    await write(repo.dev, `${SOURCE}/classes/Orphan.cls`, 'public class Orphan {}\n');
+    await write(repo.dev, `${SOURCE}/classes/Orphan.cls-meta.xml`, classMeta);
+    // Not named after Billing, and not deployed: found because it calls Billing.
+    await write(repo.dev, `${SOURCE}/classes/Legacy.cls`, 'public class Legacy { Billing b; Orphan o; }\n');
+    commitAll(repo.dev, 'billing');
+    git(repo.dev, ['push', '-q', 'origin', 'feature/b']);
+    git(repo.dev, ['checkout', '-q', 'int']);
+    await write(
+      repo.dev,
+      `${SOURCE}/classes/MonthEndChecks.cls`,
+      '@isTest\nprivate class MonthEndChecks {\n  @isTest static void run() { new billing(); }\n}\n'
+    );
+    await write(repo.dev, `${SOURCE}/classes/MonthEndChecks.cls-meta.xml`, classMeta);
+    commitAll(repo.dev, 'month end checks');
+    git(repo.dev, ['push', '-q', 'origin', 'int']);
+
+    const result = await deployBranch(options({ deployer: fakeDeployer().deployer, dryRun: true }));
+
+    expect(result.components).to.deep.equal([
+      'ApexClass:Billing',
+      'ApexClass:Invoice',
+      'ApexClass:Legacy',
+      'ApexClass:Orphan',
+    ]);
+    // Legacy mentions Billing and Orphan but is not a test class.
+    expect(result.tests).to.deep.equal(['InvoiceTest', 'MonthEndChecks']);
+    expect(result.warnings.join('\n')).to.contain('No Apex test was found for Legacy, Orphan:');
+  });
+
+  it('selects the tests declared with @IsTest(testFor=...) and the critical tests', async () => {
+    git(repo.dev, ['checkout', '-q', 'feature/b']);
+    await write(repo.dev, `${SOURCE}/classes/DelegateImpl.cls`, 'public class DelegateImpl {}\n');
+    await write(repo.dev, `${SOURCE}/classes/DelegateImpl.cls-meta.xml`, classMeta);
+    commitAll(repo.dev, 'delegate');
+    git(repo.dev, ['push', '-q', 'origin', 'feature/b']);
+    git(repo.dev, ['checkout', '-q', 'int']);
+    // Reaches DelegateImpl through Type.forName: never mentions it, declares it instead.
+    await write(
+      repo.dev,
+      `${SOURCE}/classes/CallerTest.cls`,
+      "@IsTest(testFor='ApexClass:DelegateImpl')\nprivate class CallerTest {\n  @IsTest static void run() { Type.forName('Delegate' + 'Impl'); }\n}\n"
+    );
+    await write(repo.dev, `${SOURCE}/classes/CallerTest.cls-meta.xml`, classMeta);
+    await write(repo.dev, `${SOURCE}/classes/SmokeTest.cls`, '@IsTest(critical=true)\nprivate class SmokeTest {}\n');
+    await write(repo.dev, `${SOURCE}/classes/SmokeTest.cls-meta.xml`, classMeta);
+    commitAll(repo.dev, 'declared tests');
+    git(repo.dev, ['push', '-q', 'origin', 'int']);
+
+    const result = await deployBranch(options({ deployer: fakeDeployer().deployer, dryRun: true }));
+
+    expect(result.components).to.deep.equal(['ApexClass:DelegateImpl', 'ApexClass:Invoice']);
+    expect(result.tests).to.deep.equal(['CallerTest', 'InvoiceTest', 'SmokeTest']);
+    expect(result.warnings.join('\n')).to.not.contain('No Apex test was found');
+  });
+
+  it('sends only the explicitly requested tests to Salesforce', async () => {
+    const { deployer, requests } = fakeDeployer();
+    const tests = ['InvoiceRegressionTest', 'AccountRegressionTest'];
+
+    const result = await deployBranch(options({ deployer, tests, validate: true }));
+
+    expect(result.testLevel).to.equal('RunSpecifiedTests');
+    expect(result.tests).to.deep.equal(tests);
+    expect(requests[0].testPlan).to.deep.equal({ testLevel: 'RunSpecifiedTests', tests });
+  });
+
   it('stops on a conflict without deploying', async () => {
     await write(repo.dev, `${SOURCE}/classes/Invoice.cls`, 'public class Invoice { String name; }\n');
     commitAll(repo.dev, 'other change on int');

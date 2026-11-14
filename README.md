@@ -409,7 +409,7 @@ Merge a branch into the branch of an org, deploy the result, and push the merge 
 ```
 USAGE
   $ sf df deploy -s <value> -o <value> [--json] [--flags-dir <value>] [--dry-run | --validate] [--from <value>]
-    [--allow-destructive] [-l NoTestRun|RunSpecifiedTests|RunLocalTests|RunAllTestsInOrg] [-w <value>]
+    [--allow-destructive] [-l NoTestRun|RunSpecifiedTests|RunLocalTests|RunAllTestsInOrg] [-t <value>...] [-w <value>]
 
 FLAGS
   -l, --test-level=<option>  Deployment test level.
@@ -417,8 +417,9 @@ FLAGS
   -o, --target-org=<value>   (required) Username or alias of the target org. Not required if the `target-org`
                              configuration variable is already set.
   -s, --source=<value>       (required) Branch to deliver, merged into the branch of the org.
+  -t, --tests=<value>...     Apex tests to run explicitly.
   -w, --wait=<value>         [default: 60 minutes] Number of minutes to wait for the deployment. Past this delay, the
-                             job keeps running in the org.
+                             job keeps running in the org and nothing is pushed.
       --allow-destructive    Allow a deployment that deletes components from the org.
       --dry-run              Show the merge, the delta and the tests without deploying or pushing anything.
       --from=<value>         Commit the delta starts from, instead of the tip of the org's branch.
@@ -441,8 +442,10 @@ DESCRIPTION
   to the branch, fast-forward only. When it fails, nothing is pushed: the branch still matches the org and the command
   can simply run again.
 
-  A deployment that deletes components requires --allow-destructive. Without --test-level, the tests are the classes
-  named after the deployed Apex classes (<Class>Test, <Class>_Test), or none.
+  A deployment that deletes components requires --allow-destructive. Use --tests to choose the Apex tests explicitly.
+  Without --tests or --test-level, the tests are the test classes (@isTest) named after the deployed Apex classes and
+  triggers (<Name>Test, <Name>_Test), mentioning them or declaring them in @IsTest(testFor=...), the
+  @IsTest(critical=true) test classes, plus the deployed test classes, or none.
 
   Requires git 2.40 or later.
 
@@ -459,6 +462,10 @@ EXAMPLES
 
     $ sf df deploy --source feature/JIRA-123 --target-org int --validate
 
+  Deploy and run specific Apex tests.
+
+    $ sf df deploy --source feature/JIRA-123 --target-org int --tests InvoiceTest OrderTest
+
   Redeploy after a sandbox refresh, the sandbox now holding production:
 
     $ sf df deploy --source feature/JIRA-123 --target-org int --from main
@@ -466,12 +473,17 @@ EXAMPLES
 FLAG DESCRIPTIONS
   -l, --test-level=NoTestRun|RunSpecifiedTests|RunLocalTests|RunAllTestsInOrg  Deployment test level.
 
-    Without this flag, RunSpecifiedTests with the test classes matching the deployed Apex classes, or NoTestRun when
-    none matches. RunSpecifiedTests alone fails when no test class matches.
+    Without --tests, the default is RunSpecifiedTests with the matching Apex test classes, or NoTestRun when none
+    matches. Explicitly requesting RunSpecifiedTests without --tests requires at least one match.
 
   -s, --source=<value>  Branch to deliver, merged into the branch of the org.
 
     A branch of the remote (fetched first), or any commit of the repository.
+
+  -t, --tests=<value>...  Apex tests to run explicitly.
+
+    List test names separated by spaces or repeat --tests for each name. This flag selects RunSpecifiedTests
+    automatically. If you also supply --test-level, it must be RunSpecifiedTests.
 
   --from=<value>  Commit the delta starts from, instead of the tip of the org's branch.
 

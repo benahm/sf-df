@@ -80,11 +80,30 @@ Un merge qui ne touche aucune metadata (README, CI...) est poussé sans déploie
 | `--from <ref>` | Point de départ du delta à la place de la branche de l'org (refresh, premier déploiement). |
 | `--allow-destructive` | Obligatoire dès que le delta supprime des composants (sauf en `--validate`). |
 | `--test-level`, `-l` | `NoTestRun`, `RunSpecifiedTests`, `RunLocalTests`, `RunAllTestsInOrg`. |
+| `--tests`, `-t` | Noms des tests Apex à exécuter. Active `RunSpecifiedTests` et remplace la sélection automatique. |
 | `--wait`, `-w` | Minutes d'attente (défaut 60). Au-delà, le job continue dans l'org : rien n'est poussé, et l'erreur dit comment suivre le job puis rattraper la branche s'il réussit. |
 
-Tests, sans `--test-level` : les classes `<Nom>Test` et `<Nom>_Test` des classes et triggers Apex déployés, et les classes de
-test déployées elles-mêmes. Une classe de test est reconnue à son annotation `@isTest`, pas à son nom. Aucune trouvée :
+Sans `--tests` ni `--test-level`, la commande sélectionne, pour chaque classe ou trigger Apex déployé :
+
+- les classes de test `<Nom>Test` et `<Nom>_Test` ;
+- les classes de test qui mentionnent son nom, quel que soit le leur (`MonthEndChecks` qui appelle `Invoice`) ;
+- les classes de test qui la déclarent dans `@IsTest(testFor='ApexClass:Invoice')` ou `ApexTrigger:...` ;
+- la classe elle-même si c'est une classe de test.
+
+S'y ajoutent les classes `@IsTest(critical=true)`, dès que de l'Apex est déployé. `testFor` et `critical` sont les
+annotations que lit le niveau `RunRelevantTests` de Salesforce (API 66.0, beta en Spring '26) : les liens déclarés
+aujourd'hui pour sf-df serviront tels quels le jour où ce niveau remplacera la sélection locale. Seule l'annotation de la
+classe compte, comme pour Salesforce.
+
+Une classe de test est reconnue à son annotation `@isTest`, pas à son nom. Les tests sont cherchés dans tout le projet
+tel qu'il sera après le merge, pas seulement dans le delta. Une mention dans un commentaire compte : un test en trop
+est lancé, aucun n'est oublié. Un test qui n'atteint la classe qu'à travers une autre (`Type.forName`, injection) n'est trouvé que s'il la déclare
+dans `testFor`, ni celui d'un
+trigger qui ne suit pas la convention : un warning nomme les classes et triggers sans test. Aucun test trouvé :
 `NoTestRun`.
+
+Pour choisir les tests, séparer les noms par des espaces (`--tests InvoiceTest OrderTest`) ou répéter `--tests`.
+Si `--test-level` est aussi fourni, sa valeur doit être `RunSpecifiedTests`.
 
 ## Quand la branche et l'org se décalent
 

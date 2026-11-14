@@ -47,6 +47,12 @@ export default class Deploy extends SfCommand<DeployBranchResult> {
       summary: messages.getMessage('flags.test-level.summary'),
       description: messages.getMessage('flags.test-level.description'),
     }),
+    tests: Flags.string({
+      char: 't',
+      multiple: true,
+      summary: messages.getMessage('flags.tests.summary'),
+      description: messages.getMessage('flags.tests.description'),
+    }),
     wait: Flags.duration({
       char: 'w',
       unit: 'minutes',
@@ -76,6 +82,7 @@ export default class Deploy extends SfCommand<DeployBranchResult> {
         validate: flags.validate,
         allowDestructive: flags['allow-destructive'],
         testLevel: flags['test-level'] as TestLevel | undefined,
+        tests: flags.tests,
         wait: flags.wait,
         deployer: metadataApiDeployer(connection),
         progress: (step) => {

@@ -11,14 +11,25 @@ import { findOrgConfig, type DeployConfig } from './config.js';
 import {
   fetchBranch,
   fetchSource,
+  filesMentioning,
+  listReferences,
   listTestFiles,
   pushCommit,
+  readFilesAt,
   resolveCommit,
   virtualMerge,
   type VirtualMerge,
 } from './git.js';
 import type { Deployer, DeployOutcome, Duration } from './salesforce.js';
-import { apexClassName, planTests, type TestLevel, type TestPlan } from './tests.js';
+import {
+  apexClassName,
+  parseTestAnnotations,
+  planSpecifiedTests,
+  planTests,
+  untestedApex,
+  type TestLevel,
+  type TestPlan,
+} from './tests.js';
 
 export type DeployStatus = 'dryRun' | 'validated' | 'deployed' | 'nothingToDeploy';
 
@@ -53,6 +64,7 @@ export type DeployBranchOptions = {
   validate?: boolean;
   allowDestructive?: boolean;
   testLevel?: TestLevel;
+  tests?: string[];
   wait?: Duration;
   deployer: Deployer;
   // Merge driver command, for tests. Defaults to `sf df git merge-driver run`.
@@ -92,15 +104,97 @@ const planTestsOf = async (
   sourceDir: string,
   components: string[],
   requested?: TestLevel
-): Promise<TestPlan> => {
+): Promise<PlannedTests> => {
   const deployedApex = components.flatMap((entry) => {
     const prefix = APEX_PREFIXES.find((candidate) => entry.startsWith(candidate));
     return prefix ? [entry.slice(prefix.length)] : [];
   });
-  const testClasses = (await listTestFiles(repoRoot, commit, sourceDir))
-    .map(apexClassName)
-    .filter((name): name is string => name !== undefined);
-  return planTests(deployedApex, testClasses, requested);
+  if (deployedApex.length === 0 || (requested && requested !== 'RunSpecifiedTests')) {
+    return { plan: planTests(deployedApex, [], requested), warnings: [] };
+  }
+
+  const isName = (name: string | undefined): name is string => name !== undefined;
+  const testFiles = await listTestFiles(repoRoot, commit, sourceDir);
+  const testClasses = testFiles.map(apexClassName).filter(isName);
+  const [mentions, annotations] = await Promise.all([
+    listReferences(repoRoot, commit, sourceDir, testFiles, deployedApex),
+    readTestAnnotations(repoRoot, commit, sourceDir, testFiles),
+  ]);
+  // The test classes that mention a deployed class, whatever their name, or declare it in @IsTest(testFor=...).
+  const references = new Map([...mentions].map(([name, files]) => [name, files.map(apexClassName).filter(isName)]));
+  for (const entry of components) {
+    const prefix = APEX_PREFIXES.find((candidate) => entry.startsWith(candidate));
+    const declared = prefix ? annotations.testFor.get(entry.toLowerCase()) : undefined;
+    if (prefix && declared) {
+      const name = entry.slice(prefix.length).toLowerCase();
+      references.set(name, [...(references.get(name) ?? []), ...declared]);
+    }
+  }
+
+  // A critical test runs for any Apex: it does not cover one class in particular, so it leaves the warning.
+  const untested = untestedApex(deployedApex, testClasses, references);
+  return {
+    plan: planTests(deployedApex, testClasses, requested, references, annotations.critical),
+    warnings:
+      untested.length > 0
+        ? [
+            `No Apex test was found for ${untested.join(
+              ', '
+            )}: neither named after it (<Name>Test, <Name>_Test), nor mentioning it, nor declaring it in @IsTest(testFor=...). Use --tests or --test-level to cover it.`,
+          ]
+        : [],
+  };
+};
+
+type TestDeclarations = {
+  // Test classes by lowercased "apexclass:name" or "apextrigger:name".
+  testFor: Map<string, string[]>;
+  critical: string[];
+};
+
+// The @IsTest(testFor=...) and @IsTest(critical=true) of the test classes, as RunRelevantTests reads them. Only the
+// files that contain one of those words are read.
+const readTestAnnotations = async (
+  repoRoot: string,
+  commit: string,
+  sourceDir: string,
+  testFiles: string[]
+): Promise<TestDeclarations> => {
+  const declarations: TestDeclarations = { testFor: new Map(), critical: [] };
+  const annotated = await filesMentioning(repoRoot, commit, sourceDir, testFiles, ['testFor', 'critical']);
+  for (const [file, source] of await readFilesAt(repoRoot, commit, annotated)) {
+    const name = apexClassName(file);
+    if (name === undefined) {
+      continue;
+    }
+
+    const { testFor, critical } = parseTestAnnotations(source);
+    for (const component of testFor) {
+      const key = component.toLowerCase();
+      declarations.testFor.set(key, [...(declarations.testFor.get(key) ?? []), name]);
+    }
+
+    if (critical) {
+      declarations.critical.push(name);
+    }
+  }
+
+  return declarations;
+};
+
+type PlannedTests = { plan: TestPlan; warnings: string[] };
+
+// Nothing to deploy: no test. --tests: those tests. Otherwise the tests selected from the delta.
+const choosePlan = async (
+  nothingToDeploy: boolean,
+  specifiedTests: TestPlan | undefined,
+  select: () => Promise<PlannedTests>
+): Promise<PlannedTests> => {
+  if (nothingToDeploy) {
+    return { plan: { testLevel: 'NoTestRun', tests: [] }, warnings: [] };
+  }
+
+  return specifiedTests ? { plan: specifiedTests, warnings: [] } : select();
 };
 
 // The wait is over, or the connection dropped: the job may still succeed in the org, so this is not a failure.
@@ -217,6 +311,7 @@ const pushDeployedMerge = async (
 // always describes the org.
 export const deployBranch = async (options: DeployBranchOptions): Promise<DeployBranchResult> => {
   const { repoRoot, config, progress = (): void => {} } = options;
+  const specifiedTests = options.tests === undefined ? undefined : planSpecifiedTests(options.tests, options.testLevel);
   const { remote, sourceDir } = config;
   const branch = branchOf(config, options.orgUrl);
   const { base, merge } = await mergeSource(options, branch, progress);
@@ -241,9 +336,9 @@ export const deployBranch = async (options: DeployBranchOptions): Promise<Deploy
       manifestMembers(destructiveManifest),
     ]);
     const nothingToDeploy = components.length === 0 && deletions.length === 0;
-    const plan: TestPlan = nothingToDeploy
-      ? { testLevel: 'NoTestRun', tests: [] }
-      : await planTestsOf(repoRoot, merge.commit, sourceDir, components, options.testLevel);
+    const { plan, warnings: testWarnings } = await choosePlan(nothingToDeploy, specifiedTests, async () =>
+      planTestsOf(repoRoot, merge.commit, sourceDir, components, options.testLevel)
+    );
 
     const result: DeployBranchResult = {
       status: 'nothingToDeploy',
@@ -259,7 +354,7 @@ export const deployBranch = async (options: DeployBranchOptions): Promise<Deploy
       deletions,
       testLevel: plan.testLevel,
       tests: plan.tests,
-      warnings: [...delta.warnings],
+      warnings: [...delta.warnings, ...testWarnings],
     };
 
     if (options.dryRun) {
